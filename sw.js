@@ -1,6 +1,8 @@
 // Service worker do Meow Hero — cache-first do shell, para o jogo funcionar
 // offline (importante: durante a corrida a conexão pode cair).
-const VERSION = 'meowhero-v1';
+// Suba esta versão a cada mudança de código ou asset: o cache é cache-first,
+// então sem isso um app já instalado continuaria servindo os arquivos antigos.
+const VERSION = 'meowhero-v2';
 
 const SHELL = [
   './',
