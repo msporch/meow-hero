@@ -1,0 +1,253 @@
+/* ---------- Meow Hero — shell retrô ---------- */
+:root {
+  --dmg-0: #0f380f;   /* mais escuro */
+  --dmg-1: #306230;
+  --dmg-2: #8bac0f;
+  --dmg-3: #9bbc0f;   /* mais claro */
+
+  --shell:      #1b1d18;
+  --shell-hi:   #2b2f27;
+  --shell-lo:   #101210;
+  --bezel:      #0a0c09;
+  --btn:        #3b4034;
+  --btn-hi:     #4d5344;
+  --btn-press:  #262a21;
+  --ink:        #7d8a6b;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--shell-lo);
+  color: var(--ink);
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- Shell ---------- */
+#shell {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 2vh, 18px);
+  padding: clamp(8px, 2.5vh, 22px) clamp(10px, 4vw, 28px);
+  background: linear-gradient(180deg, var(--shell-hi) 0%, var(--shell) 45%, var(--shell-lo) 100%);
+}
+
+/* ---------- LCD ---------- */
+#lcd {
+  width: 100%;
+  background: var(--bezel);
+  border-radius: 10px 10px 26px 10px;
+  padding: clamp(10px, 3vw, 18px) clamp(10px, 3vw, 18px) clamp(6px, 1.6vw, 10px);
+  box-shadow: inset 0 2px 0 #000, 0 2px 0 var(--shell-hi);
+  flex: 0 0 auto;
+}
+
+#lcd-inner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 160 / 144;
+  background: var(--dmg-3);
+  overflow: hidden;
+}
+
+#screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Grade de LCD sutil — some em telas pequenas para não sujar o pixel art */
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .16;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.55) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+body.no-scanlines #scanlines { display: none; }
+
+#lcd-label {
+  margin-top: clamp(5px, 1.4vw, 9px);
+  text-align: center;
+  font-size: clamp(6px, 2vw, 9px);
+  letter-spacing: .14em;
+  color: #55604a;
+  text-transform: uppercase;
+}
+#lcd-label span { margin: 0 .5em; color: #7e3f6a; }
+
+/* ---------- Controles ---------- */
+#controls {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* D-pad decorativo */
+#dpad {
+  position: relative;
+  width: clamp(74px, 24vw, 104px);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+}
+.dp {
+  position: absolute;
+  background: var(--btn);
+  border-radius: 5px;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.4);
+}
+.dp-v { left: 34%; top: 0; width: 32%; height: 100%; }
+.dp-h { top: 34%; left: 0; height: 32%; width: 100%; }
+.dp-c {
+  position: absolute; left: 38%; top: 38%; width: 24%; height: 24%;
+  background: var(--btn-press); border-radius: 50%;
+}
+
+/* Áreas de toque reais sobre o desenho do D-pad */
+.dp-hit {
+  position: absolute;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.dp-hit.on { background: rgba(0, 0, 0, .28); border-radius: 5px; }
+.dp-hit-up    { left: 30%; top: -4%;  width: 40%; height: 42%; }
+.dp-hit-down  { left: 30%; top: 62%;  width: 40%; height: 42%; }
+.dp-hit-left  { top: 30%; left: -4%;  height: 40%; width: 42%; }
+.dp-hit-right { top: 30%; left: 62%;  height: 40%; width: 42%; }
+
+/* Botões A / B */
+#ab {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 4vw, 20px);
+  transform: rotate(-18deg);
+  flex: 0 0 auto;
+}
+.round {
+  width: clamp(52px, 17vw, 74px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: none;
+  background: var(--btn);
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(13px, 4vw, 18px);
+  font-weight: 700;
+  letter-spacing: .05em;
+  box-shadow: 0 4px 0 var(--shell-lo), inset 0 -3px 0 rgba(0,0,0,.35);
+  transition: transform .04s, box-shadow .04s, background .1s;
+  cursor: pointer;
+}
+.round:active, .round.on {
+  background: var(--btn-press);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--shell-lo), inset 0 -1px 0 rgba(0,0,0,.35);
+}
+#btn-a { background: var(--btn-hi); }
+
+/* START / SELECT */
+#startsel {
+  display: flex;
+  gap: clamp(14px, 6vw, 30px);
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.pill {
+  border: none;
+  background: var(--btn);
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(9px, 2.6vw, 11px);
+  font-weight: 700;
+  letter-spacing: .12em;
+  padding: clamp(6px, 1.6vw, 9px) clamp(14px, 5vw, 24px);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--shell-lo);
+  transition: transform .04s, box-shadow .04s, background .1s;
+  cursor: pointer;
+}
+.pill:active, .pill.on {
+  background: var(--btn-press);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--shell-lo);
+}
+
+#hint {
+  margin: 0;
+  font-size: clamp(8px, 2.4vw, 10px);
+  text-align: center;
+  color: #4d5644;
+  letter-spacing: .04em;
+  flex: 0 0 auto;
+}
+#hint b { color: var(--ink); }
+
+/* ---------- Banner de instalação ---------- */
+#install-bar {
+  position: fixed;
+  left: 50%; bottom: calc(10px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(94vw, 440px);
+  padding: 10px 12px;
+  background: var(--dmg-0);
+  color: var(--dmg-3);
+  border: 2px solid var(--dmg-1);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5);
+}
+#install-bar[hidden] { display: none; }
+#install-bar span { flex: 1; }
+#install-bar button {
+  border: none; font: inherit; font-weight: 700; cursor: pointer;
+  background: var(--dmg-2); color: var(--dmg-0);
+  padding: 6px 12px; border-radius: 5px;
+}
+#install-no { background: transparent; color: var(--dmg-2); padding: 6px 8px; }
+
+/* ---------- Paisagem / telas largas ---------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  #shell { max-width: none; flex-direction: row; align-items: center; gap: 16px; }
+  #lcd { width: auto; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+  #lcd-inner { height: min(100%, 78vh); width: auto; aspect-ratio: 160/144; }
+  #controls { flex-direction: column; flex: 1; }
+  #startsel { flex-direction: column; }
+  #hint { display: none; }
+}
+
+@media (min-width: 900px) and (orientation: landscape) {
+  #lcd-inner { max-height: 70vh; margin: 0 auto; }
+}

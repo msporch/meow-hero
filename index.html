@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f380f">
+<meta name="description" content="Endless runner retrô movido pela sua corrida real. Corra de verdade para salvar o gato.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meow Hero">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+<title>Meow Hero</title>
+</head>
+<body>
+
+<div id="shell">
+
+  <!-- ---------- TELA LCD ---------- -->
+  <div id="lcd">
+    <div id="lcd-inner">
+      <canvas id="screen" width="160" height="144"></canvas>
+      <div id="scanlines" aria-hidden="true"></div>
+    </div>
+    <div id="lcd-label">MEOW HERO<span>·</span>DOT MATRIX WITH STEREO SOUND</div>
+  </div>
+
+  <!-- ---------- CONTROLES ---------- -->
+  <div id="controls">
+    <div id="dpad">
+      <div class="dp dp-v" aria-hidden="true"></div>
+      <div class="dp dp-h" aria-hidden="true"></div>
+      <div class="dp-c" aria-hidden="true"></div>
+      <button id="dp-up"    class="dp-hit dp-hit-up"    type="button" aria-label="Cima"></button>
+      <button id="dp-down"  class="dp-hit dp-hit-down"  type="button" aria-label="Baixo"></button>
+      <button id="dp-left"  class="dp-hit dp-hit-left"  type="button" aria-label="Esquerda"></button>
+      <button id="dp-right" class="dp-hit dp-hit-right" type="button" aria-label="Direita"></button>
+    </div>
+
+    <div id="ab">
+      <button id="btn-b" class="round" type="button" aria-label="Botão B">B</button>
+      <button id="btn-a" class="round" type="button" aria-label="Botão A — pular">A</button>
+    </div>
+  </div>
+
+  <div id="startsel">
+    <button id="btn-select" class="pill" type="button">SELECT</button>
+    <button id="btn-start" class="pill" type="button">START</button>
+  </div>
+
+  <p id="hint">Escolha a meta e guarde o celular no bolso.<br><b>START</b> confirma · <b>SELECT</b> apaga a tela</p>
+</div>
+
+<!-- ---------- Banner de instalação ---------- -->
+<div id="install-bar" hidden>
+  <span>Instalar o Meow Hero no celular?</span>
+  <button id="install-yes" type="button">Instalar</button>
+  <button id="install-no" type="button" aria-label="Dispensar">✕</button>
+</div>
+
+<noscript>
+  <p style="color:#9bbc0f;text-align:center;padding:2rem">O Meow Hero precisa de JavaScript.</p>
+</noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

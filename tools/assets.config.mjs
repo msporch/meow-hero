@@ -1,0 +1,92 @@
+// Catálogo declarativo de todos os assets do Meow Hero.
+// Tudo é gerado pelo MCP do PixelLab.
+
+// --- Personagens (create_character + animate_character) ---
+export const CHARACTERS = {
+  hero: {
+    create: {
+      description: 'young athletic runner boy wearing a green tracksuit, headband and running sneakers, determined face',
+      name: 'Meow Hero Runner',
+      body_type: 'humanoid',
+      mode: 'standard',
+      n_directions: 4,
+      // 32px mantém o herói em ~1/3 da altura útil da tela (144px), deixando espaço de pulo.
+      size: 32,
+      view: 'side',
+      outline: 'single color black outline',
+      shading: 'flat shading',
+      detail: 'low detail',
+      proportions: '{"type": "preset", "name": "heroic"}',
+      text_guidance_scale: 9,
+    },
+    animations: [
+      { key: 'run',  template_animation_id: 'running-8-frames', animation_name: 'hero_run',  directions: ['east'] },
+      { key: 'jump', template_animation_id: 'two-footed-jump',  animation_name: 'hero_jump', directions: ['east'] },
+      { key: 'idle', template_animation_id: 'breathing-idle',   animation_name: 'hero_idle', directions: ['east'] },
+    ],
+  },
+  cat: {
+    create: {
+      description: 'small scared orange tabby kitten, big worried eyes, fluffy tail',
+      name: 'Meow Hero Cat',
+      body_type: 'quadruped',
+      template: 'cat',
+      mode: 'standard',
+      n_directions: 4,
+      // Menor que o herói, para a proporção gato/pessoa ficar crível.
+      size: 22,
+      view: 'side',
+      outline: 'single color black outline',
+      shading: 'flat shading',
+      detail: 'low detail',
+      text_guidance_scale: 9,
+    },
+    animations: [
+      { key: 'sit',   template_animation_id: 'sitting', animation_name: 'cat_sit',   directions: ['east'] },
+      { key: 'happy', template_animation_id: 'jump',    animation_name: 'cat_happy', directions: ['east'] },
+    ],
+  },
+};
+
+// --- Sprites soltos (create_image_pixflux, fundo transparente, paleta DMG forçada) ---
+export const SPRITES = {
+  coin:        { description: 'shiny round gold coin with a cat paw print engraved on it, thick black outline', width: 32, height: 32, view: 'side' },
+  milk:        { description: 'small milk carton with a cat face printed on it, thick black outline',           width: 32, height: 32, view: 'side' },
+  trash_bin:   { description: 'metal street trash bin with lid, thick black outline',                            width: 32, height: 40, view: 'side' },
+  cone:        { description: 'traffic cone with reflective stripe, thick black outline',                        width: 32, height: 32, view: 'side' },
+  box:         { description: 'stack of cardboard boxes, thick black outline',                                   width: 32, height: 32, view: 'side' },
+  puddle:      { description: 'shallow water puddle on asphalt seen from the side, thick black outline',         width: 48, height: 24, view: 'side' },
+  hydrant:     { description: 'street fire hydrant, thick black outline',                                        width: 32, height: 40, view: 'side' },
+  sign:        { description: 'roadside distance marker signpost with blank square sign on a pole, thick black outline', width: 32, height: 48, view: 'side' },
+  streetlight: { description: 'tall city street lamp post with a lamp head, thick black outline',                width: 32, height: 72, view: 'side' },
+  bush:        { description: 'small round street bush in a planter, thick black outline',                        width: 32, height: 32, view: 'side' },
+  truck:       { description: 'blocky delivery truck seen from the side driving left, thick black outline',      width: 96, height: 56, view: 'side', direction: 'west' },
+  heart:       { description: 'pixel heart icon, thick black outline',                                            width: 32, height: 32, view: 'side' },
+};
+
+// --- Fundos e telas (opacos, paleta DMG forçada) ---
+export const SCENES = {
+  bg_sky:   { description: 'distant city skyline silhouette against an empty sky, simple flat retro game background layer', width: 160, height: 72,  no_background: false, detail: 'low detail' },
+  bg_city:  { description: 'row of simple city buildings with windows, flat retro game parallax background layer',          width: 160, height: 88,  no_background: false, detail: 'low detail' },
+  title_art:{ description: 'a boy running fast on a city street towards a small kitten sitting on the road, retro game title screen illustration', width: 160, height: 144, no_background: false, detail: 'medium detail' },
+};
+
+// --- Tileset do chão (create_sidescroller_tileset) ---
+export const TILESETS = {
+  road: {
+    lower_description: 'dark grey asphalt road with cracks',
+    transition_description: 'light concrete sidewalk pavement',
+    transition_size: 0.5,
+    tile_size: { width: 16, height: 16 },
+    outline: 'selective outline',
+    shading: 'flat shading',
+    detail: 'low detail',
+    seed: 7412,
+  },
+};
+
+// --- Animações de sprites soltos (animate_image, encadeado após o sprite ficar pronto) ---
+export const SPRITE_ANIMS = {
+  coin_spin:  { from: 'coin',  action: 'coin spinning around its vertical axis', frame_count: 8 },
+  milk_bob:   { from: 'milk',  action: 'bobbing gently up and down',             frame_count: 6 },
+};

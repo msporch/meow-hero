@@ -1,0 +1,5 @@
+node_modules/
+tools/.pixellab-token
+tools/.cache/
+assets/_raw/
+*.log

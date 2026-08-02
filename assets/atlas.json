@@ -1,0 +1,189 @@
+{
+  "palette": [
+    "#0f380f",
+    "#306230",
+    "#8bac0f",
+    "#9bbc0f"
+  ],
+  "sprites": {
+    "coin": {
+      "file": "sprites/coin.png",
+      "w": 15,
+      "h": 15,
+      "anchorX": 8,
+      "anchorY": 15
+    },
+    "milk": {
+      "file": "sprites/milk.png",
+      "w": 10,
+      "h": 14,
+      "anchorX": 5,
+      "anchorY": 14
+    },
+    "trash_bin": {
+      "file": "sprites/trash_bin.png",
+      "w": 11,
+      "h": 17,
+      "anchorX": 6,
+      "anchorY": 17
+    },
+    "cone": {
+      "file": "sprites/cone.png",
+      "w": 12,
+      "h": 15,
+      "anchorX": 6,
+      "anchorY": 15
+    },
+    "box": {
+      "file": "sprites/box.png",
+      "w": 12,
+      "h": 15,
+      "anchorX": 6,
+      "anchorY": 15
+    },
+    "puddle": {
+      "file": "sprites/puddle.png",
+      "w": 23,
+      "h": 10,
+      "anchorX": 12,
+      "anchorY": 10
+    },
+    "hydrant": {
+      "file": "sprites/hydrant.png",
+      "w": 11,
+      "h": 17,
+      "anchorX": 6,
+      "anchorY": 17
+    },
+    "sign": {
+      "file": "sprites/sign.png",
+      "w": 8,
+      "h": 19,
+      "anchorX": 4,
+      "anchorY": 19
+    },
+    "streetlight": {
+      "file": "sprites/streetlight.png",
+      "w": 5,
+      "h": 35,
+      "anchorX": 3,
+      "anchorY": 35
+    },
+    "bush": {
+      "file": "sprites/bush.png",
+      "w": 7,
+      "h": 14,
+      "anchorX": 4,
+      "anchorY": 14
+    },
+    "truck": {
+      "file": "sprites/truck.png",
+      "w": 67,
+      "h": 42,
+      "anchorX": 34,
+      "anchorY": 42
+    },
+    "heart": {
+      "file": "sprites/heart.png",
+      "w": 11,
+      "h": 11,
+      "anchorX": 6,
+      "anchorY": 11
+    },
+    "bg_sky": {
+      "file": "sprites/bg_sky.png",
+      "w": 160,
+      "h": 51,
+      "anchorX": 0,
+      "anchorY": 0
+    },
+    "bg_city": {
+      "file": "sprites/bg_city.png",
+      "w": 160,
+      "h": 78,
+      "anchorX": 0,
+      "anchorY": 0
+    },
+    "title_art": {
+      "file": "sprites/title_art.png",
+      "w": 160,
+      "h": 144,
+      "anchorX": 0,
+      "anchorY": 0
+    },
+    "tileset_road": {
+      "file": "sprites/tileset_road.png",
+      "w": 64,
+      "h": 64,
+      "tile": 16,
+      "cols": 4,
+      "anchorX": 0,
+      "anchorY": 0
+    },
+    "ground": {
+      "file": "sprites/ground.png",
+      "w": 16,
+      "h": 28,
+      "anchorX": 0,
+      "anchorY": 0
+    }
+  },
+  "anims": {
+    "cat_happy": {
+      "file": "sprites/cat_happy.png",
+      "fw": 27,
+      "fh": 24,
+      "frames": 8,
+      "anchorX": 14,
+      "anchorY": 24
+    },
+    "cat_pose": {
+      "file": "sprites/cat_pose.png",
+      "fw": 21,
+      "fh": 17,
+      "frames": 1,
+      "anchorX": 11,
+      "anchorY": 17
+    },
+    "cat_sit": {
+      "file": "sprites/cat_sit.png",
+      "fw": 22,
+      "fh": 17,
+      "frames": 8,
+      "anchorX": 11,
+      "anchorY": 17
+    },
+    "hero_idle": {
+      "file": "sprites/hero_idle.png",
+      "fw": 15,
+      "fh": 43,
+      "frames": 4,
+      "anchorX": 8,
+      "anchorY": 43
+    },
+    "hero_jump": {
+      "file": "sprites/hero_jump.png",
+      "fw": 20,
+      "fh": 46,
+      "frames": 7,
+      "anchorX": 10,
+      "anchorY": 46
+    },
+    "hero_pose": {
+      "file": "sprites/hero_pose.png",
+      "fw": 14,
+      "fh": 43,
+      "frames": 1,
+      "anchorX": 7,
+      "anchorY": 43
+    },
+    "hero_run": {
+      "file": "sprites/hero_run.png",
+      "fw": 33,
+      "fh": 42,
+      "frames": 8,
+      "anchorX": 17,
+      "anchorY": 42
+    }
+  }
+}
