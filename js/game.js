@@ -66,6 +66,12 @@ export class Game {
     this.menuIndex = 0;
     this.toast = null;
     this.toastT = 0;
+
+    // Diagnóstico (botão B durante a corrida). Existe porque os problemas de
+    // rastreio só aparecem no aparelho de verdade, em movimento — não dá para
+    // reproduzir no desktop.
+    this.debug = false;
+    this._fps = 60;
   }
 
   // ---------------- ciclo ----------------
@@ -80,6 +86,7 @@ export class Game {
   update(dt) {
     this.t += dt;
     this.frame++;
+    if (dt > 0) this._fps += (1 / dt - this._fps) * 0.05;
     if (this.toastT > 0) this.toastT -= dt;
 
     this.tracker.tick(dt);
@@ -121,11 +128,15 @@ export class Game {
     // um túnel) — senão o atraso ficaria sendo arrastado pelo resto da corrida.
     const gain = Math.abs(gap) > SHOWN_CATCHUP_M ? SHOWN_GAIN_CATCHUP : SHOWN_GAIN;
 
-    // Teto de velocidade: mesmo recuperando, o cenário corre em vez de saltar.
-    const v = Math.min(Math.max(0, tr.speedMs + gap * gain), SHOWN_MAX_SPEED);
+    // displaySpeedMs não zera enquanto o estado for "em movimento": é o que
+    // mantém o cenário rolando sem depender de o GPS responder.
+    const base = tr.displaySpeedMs;
 
-    // Projeta no máximo ~2 s além do último fix; parado, o cenário para junto.
-    const ceiling = real + Math.max(2, tr.speedMs * 2);
+    // Teto de velocidade: mesmo recuperando, o cenário corre em vez de saltar.
+    const v = Math.min(Math.max(0, base + gap * gain), SHOWN_MAX_SPEED);
+
+    // Projeta à frente do último fix enquanto anda; parado, o cenário para junto.
+    const ceiling = real + (tr.moving ? Math.max(6, base * 3) : 2);
     this.shownM = Math.max(this.shownM, Math.min(this.shownM + v * dt, ceiling));
   }
 
@@ -377,7 +388,10 @@ export class Game {
     this.timeLeft -= dt;
 
     // Entra em modo bolso após um tempo sem toque — é o uso previsto.
-    if (!this.pocket && performance.now() - this.lastTouch > 20000) this.pocket = true;
+    // Com o diagnóstico aberto não apaga: a tela existe para ser observada.
+    if (!this.pocket && !this.debug && performance.now() - this.lastTouch > 20000) {
+      this.pocket = true;
+    }
 
     const dist = tr.distanceM;
 
@@ -464,6 +478,7 @@ export class Game {
   _inputRun(key) {
     if (key === 'start') { sfx.pause(); this.go(S.PAUSE); }
     else if (key === 'select') { this.pocket = true; vibrate(30); }
+    else if (key === 'b') { this.debug = !this.debug; sfx.select(); }
     else if (key === 'a' && this.mode === 'demo') this.tracker.demoNudge(120);
   }
 
@@ -575,9 +590,10 @@ export class Game {
     // Posição suavizada: o mundo rola continuamente mesmo com fixes a cada 1 s.
     const worldX = this.shownM * PX_PER_M;
 
-    // O herói só corre quando o usuário se move de verdade.
-    const moving = tr.isMoving;
-    const cadence = Math.min(18, 5 + tr.speedMs * 3.2);
+    // O herói corre enquanto o estado for "em movimento" — que liga no primeiro
+    // passo detectado e só desliga após alguns segundos parado de verdade.
+    const moving = tr.moving;
+    const cadence = Math.min(18, 5 + tr.displaySpeedMs * 3.2);
     const anim = moving ? 'hero_run' : 'hero_idle';
     const frame = moving ? Math.floor(this.elapsed * cadence) : Math.floor(this.elapsed * 3);
 
@@ -597,6 +613,7 @@ export class Game {
 
     this._drawWorld(worldX, { heroAnim: anim, heroFrame: frame, catX, truckX });
     this._drawHud();
+    if (this.debug) this._drawDebug();
   }
 
   _drawHud() {
@@ -618,12 +635,46 @@ export class Game {
 
     // Moedas e ritmo, na faixa de céu (fora do HUD escuro).
     drawTextShadow(ctx, `\x05${String(this.coins).padStart(4, '0')}`, 3, HUD_H + 3, 0, 3);
-    const pace = tr.isMoving ? formatPace(tr.paceMinKm) : '--:--';
+    const pace = tr.moving ? formatPace(tr.paceMinKm) : '--:--';
     drawTextShadow(ctx, `${pace}/KM`, W - 3, HUD_H + 3, 0, 3, 'right');
 
     if (tr.status === 'stale') {
       drawTextShadow(ctx, 'SINAL FRACO', W / 2, HUD_H + 14, 0, 3, 'center');
     }
+  }
+
+  /**
+   * Painel de diagnóstico do rastreio (botão B durante a corrida).
+   *
+   * Mostra de onde vem cada número: quantos fixes chegaram e quantos foram
+   * descartados por precisão, jitter ou salto absurdo; a velocidade da janela
+   * contra a de exibição; e o quanto o cenário está atrás da distância real.
+   */
+  _drawDebug() {
+    const tr = this.tracker;
+    rect(0, 0, W, H, 0);
+
+    const L = (y, txt, cor = 3) => drawText(ctx, txt, 3, y, cor);
+    let y = 3;
+    drawText(ctx, 'DIAGNOSTICO', W / 2, y, 2, 'center'); y += 11;
+
+    L(y, `MODO ${this.mode.toUpperCase()}  ${tr.status.toUpperCase()}`); y += 9;
+    L(y, `PRECISAO ${tr.accuracy == null ? '--' : Math.round(tr.accuracy) + 'M'}`); y += 9;
+
+    L(y, 'FIXES', 2); y += 9;
+    L(y, ` RECEB ${tr.fixesRecebidos}  USADOS ${tr.fixesAceitos}`); y += 9;
+    L(y, ` IMPREC ${tr.fixesImprecisos}  JITTER ${tr.fixesJitter}`); y += 9;
+    L(y, ` ABSURDO ${tr.fixesAbsurdos}`); y += 11;
+
+    L(y, 'MOVIMENTO', 2); y += 9;
+    L(y, ` ${tr.moving ? 'ANDANDO' : 'PARADO'}   PASSOS ${tr.steps}`); y += 9;
+    L(y, ` JANELA ${tr.windowSpeed.toFixed(2)} TELA ${tr.displaySpeedMs.toFixed(2)}`); y += 9;
+    L(y, ` SENSOR ${tr.motionOk ? 'SIM' : 'NAO'}  FPS ${Math.round(this._fps)}`); y += 11;
+
+    L(y, `REAL ${tr.distanceM.toFixed(1)}M`); y += 9;
+    L(y, `TELA ${this.shownM.toFixed(1)}M  DIF ${(tr.distanceM - this.shownM).toFixed(1)}`); y += 11;
+
+    drawText(ctx, 'B FECHA', W / 2, H - 10, 1, 'center');
   }
 
   _drawPause() {

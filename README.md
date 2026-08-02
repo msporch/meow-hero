@@ -43,6 +43,13 @@ A tela entra em **modo bolso** (quase apagada, mostrando só distância e tempo
 em tom escuro) depois de 20 s sem toque, ou na hora com **SELECT**. Um toque
 acorda. **START** pausa.
 
+O botão **B** abre o **diagnóstico do rastreio**: quantos fixes chegaram e
+quantos foram descartados (por precisão, jitter ou salto absurdo), a velocidade
+da janela contra a de exibição, o estado de movimento, os passos detectados, o
+FPS e o quanto o cenário está atrás da distância real. Serve para descobrir o
+que está errado quando o problema só aparece correndo de verdade — com ele
+aberto a tela não apaga.
+
 ---
 
 ## Estrutura
@@ -200,6 +207,30 @@ encenada em coordenadas de tela — senão ele só apareceria nos últimos 5 met
 **Percurso determinístico.** A mesma meta gera sempre o mesmo trajeto (PRNG
 semeado pela distância). Repetir uma meta é repetir o mesmo caminho, o que
 torna a comparação entre corridas mais justa.
+
+**O estado de movimento não vem de um fix só.** A velocidade saía da comparação
+entre dois fixes de GPS consecutivos, e isso quebra na prática. Caminhando a
+1,3 m/s com um fix por segundo, cada fix anda ~1,3 m — **abaixo do limiar de
+jitter de 1,5 m**, então metade deles é descartada. Somado a um decaimento que
+rodava por frame em vez de por segundo (`0.9⁶⁰ ≈ 0,002`), a velocidade zerava em
+um segundo e o herói ficava parado enquanto o usuário andava.
+
+Hoje a velocidade vem de uma **janela deslizante de deslocamento** (5 s), e o
+estado de movimento tem histerese e duas fontes independentes:
+
+- **liga** assim que o acelerômetro detecta um passo ou a janela acusa
+  deslocamento — o acelerômetro responde em menos de um passo, sem esperar
+  satélite;
+- **desliga** só depois de ~2,5 s com os dois sinais em silêncio, medidos numa
+  janela curta (a de 5 s é boa para estimar ritmo, mas lenta para perceber
+  parada).
+
+Enquanto o estado for "em movimento", a rolagem nunca zera. É isso que faz o
+cenário andar de forma contínua sem depender de o GPS responder.
+
+O acelerômetro roda em **todos** os modos, mas só o modo PASSOS o usa como
+fonte de distância. No modo GPS ele é apenas o detector de movimento — a
+distância continua vindo do satélite.
 
 **Distância desenhada ≠ distância medida.** O GPS entrega cerca de um fix por
 segundo, então a distância real anda aos degraus. Medindo uma corrida a 3 m/s,

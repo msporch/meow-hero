@@ -45,6 +45,24 @@ export const GPS_MIN_DELTA = 1.5;     // m — abaixo disso é jitter
 export const GPS_MAX_SPEED = 9;       // m/s — acima disso é fix ruim (~32 km/h)
 export const GPS_TIMEOUT_MS = 25000;  // sem fix nesse tempo → avisa
 
+/**
+ * Estado de movimento.
+ *
+ * A velocidade não sai mais de um fix contra o outro: isso é instável demais
+ * (caminhando a 1,3 m/s cada fix anda ~1,3 m, abaixo do limiar de jitter, e a
+ * leitura zerava). Em vez disso é medida sobre uma janela deslizante de
+ * deslocamento, e o estado tem histerese: entra em movimento na hora, e só sai
+ * depois de alguns segundos parado de verdade.
+ */
+export const SPEED_WINDOW_MS = 5000;   // janela para estimar a velocidade
+export const STOP_WINDOW_MS = 2500;    // janela curta, só para detectar a parada
+export const SPEED_SAMPLE_MS = 250;    // frequência de amostragem da janela
+export const MOVE_ON_SPEED = 0.45;     // m/s — acima disso considera em movimento
+export const MOVE_MIN_SPEED = 0.6;     // m/s — piso da rolagem enquanto anda
+export const STOP_CONFIRM_MS = 2500;   // parado por tanto tempo → herói para
+export const STEP_RECENT_MS = 2000;    // passo mais recente que isso = andando
+export const SPEED_DECAY_TAU = 2.5;    // s — constante de tempo do decaimento
+
 /** Passada padrão quando o usuário não informa a altura (m). */
 export const DEFAULT_STRIDE = 0.78;
 

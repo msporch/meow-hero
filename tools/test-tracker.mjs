@@ -28,15 +28,25 @@ console.log('\n— acumulação em linha reta —');
 {
   const tr = new Tracker();
   tr.running = true; tr.mode = 'gps';
-  let lat = -23.55, t = 1000;
-  tr._onFix(fix(lat, -46.63, 8, t));              // primeiro fix: só referência
-  // 100 passos de 10 m, 1 fix por segundo (10 m/s seria rápido demais → usa 3 s)
+
+  // A velocidade agora vem da janela deslizante, atualizada no tick — então o
+  // teste precisa rodar o loop do jogo, não só entregar fixes.
+  let now = 1000;
+  const realNow = performance.now.bind(performance);
+  performance.now = () => now;
+
+  let lat = -23.55;
+  tr._onFix(fix(lat, -46.63, 8, now));            // primeiro fix: só referência
+  // 100 trechos de 10 m a cada 3 s → 3,33 m/s
   for (let i = 0; i < 100; i++) {
-    lat = north(lat, 10); t += 3000;
-    tr._onFix(fix(lat, -46.63, 8, t));
+    for (let k = 0; k < 180; k++) { now += 1000 / 60; tr.tick(1 / 60); }
+    lat = north(lat, 10);
+    tr._onFix(fix(lat, -46.63, 8, now));
   }
+  performance.now = realNow;
+
   check('1000 m acumulados', approx(tr.distanceM, 1000, 5), `→ ${tr.distanceM.toFixed(1)}`);
-  check('velocidade ~3.33 m/s', approx(tr.speedMs, 3.33, 0.5), `→ ${tr.speedMs.toFixed(2)}`);
+  check('velocidade ~3.33 m/s', approx(tr.speedMs, 3.33, 0.6), `→ ${tr.speedMs.toFixed(2)}`);
   check('status ok', tr.status === 'ok');
 }
 
@@ -111,6 +121,93 @@ console.log('\n— pedômetro —');
   performance.now = realNow;
   check('100 passos contados', tr.steps === 100, `→ ${tr.steps}`);
   check('distância = passos x passada', approx(tr.distanceM, 80, 0.01), `→ ${tr.distanceM.toFixed(2)}`);
+}
+
+// Reproduz o caso do celular: caminhada a 1,3 m/s com fix a cada segundo.
+// Cada fix isolado anda ~1,3 m, ABAIXO do limiar de jitter (1,5 m) — era isso
+// que zerava a velocidade e deixava o herói parado com o fundo pulando.
+console.log('\n— caminhada lenta: herói não pode parar —');
+{
+  const tr = new Tracker();
+  tr.mode = 'gps'; tr.running = true;
+
+  let now = 1000;
+  const realNow = performance.now.bind(performance);
+  performance.now = () => now;
+
+  let lat = -23.55;
+  tr._onFix(fix(lat, -46.63, 8, now));
+
+  let minDisplay = Infinity, framesParado = 0, total = 0;
+  for (let s = 0; s < 40; s++) {
+    for (let k = 0; k < 60; k++) {
+      now += 1000 / 60;
+      tr.tick(1 / 60);
+      if (s >= 8) {                       // depois da janela encher
+        total++;
+        minDisplay = Math.min(minDisplay, tr.displaySpeedMs);
+        if (!tr.moving) framesParado++;
+      }
+    }
+    lat = north(lat, 1.3);
+    tr._onFix(fix(lat, -46.63, 8, now));
+  }
+  performance.now = realNow;
+
+  check('distância acumulada ~52 m', approx(tr.distanceM, 52, 3), `→ ${tr.distanceM.toFixed(1)}`);
+  check('nunca deixou de estar em movimento', framesParado === 0, `→ ${framesParado}/${total} frames parado`);
+  check('velocidade de exibição nunca zerou', minDisplay >= 0.9, `→ min ${minDisplay.toFixed(2)} m/s`);
+  check('ritmo do HUD não fica --:--', isFinite(tr.paceMinKm), `→ ${formatPace(tr.paceMinKm)}`);
+}
+
+console.log('\n— parar de verdade encerra o movimento —');
+{
+  const tr = new Tracker();
+  tr.mode = 'gps'; tr.running = true;
+  let now = 1000;
+  const realNow = performance.now.bind(performance);
+  performance.now = () => now;
+
+  let lat = -23.55;
+  tr._onFix(fix(lat, -46.63, 8, now));
+  for (let s = 0; s < 15; s++) {
+    for (let k = 0; k < 60; k++) { now += 1000 / 60; tr.tick(1 / 60); }
+    lat = north(lat, 3);
+    tr._onFix(fix(lat, -46.63, 8, now));
+  }
+  check('estava em movimento', tr.moving === true);
+
+  // Para: sem novos fixes e sem passos.
+  let parouApos = -1;
+  for (let s = 0; s < 20 && parouApos < 0; s++) {
+    for (let k = 0; k < 60; k++) {
+      now += 1000 / 60;
+      tr.tick(1 / 60);
+      if (!tr.moving && parouApos < 0) parouApos = (now - 1000) / 1000 - 15;
+    }
+  }
+  performance.now = realNow;
+  check('herói parou em poucos segundos', parouApos > 0 && parouApos < 9, `→ ${parouApos.toFixed(1)} s`);
+  check('velocidade de exibição zerou', tr.displaySpeedMs === 0);
+}
+
+console.log('\n— acelerômetro sozinho já põe em movimento —');
+{
+  const tr = new Tracker();
+  tr.mode = 'gps'; tr.running = true;   // GPS sem nenhum fix ainda
+  let now = 1000;
+  const realNow = performance.now.bind(performance);
+  performance.now = () => now;
+
+  const accel = v => tr._onAccel({ accelerationIncludingGravity: { x: 0, y: 0, z: 9.81 + v } });
+  for (let i = 0; i < 200; i++) accel(0);
+  for (let i = 0; i < 6; i++) { now += 300; accel(3.0); now += 300; accel(-2.0); tr.tick(1 / 60); }
+  const moveuSemGps = tr.moving;
+  const semDistancia = tr.distanceM === 0;
+  performance.now = realNow;
+
+  check('entra em movimento sem nenhum fix de GPS', moveuSemGps === true);
+  check('no modo GPS o passo não inventa distância', semDistancia, `→ ${tr.distanceM}`);
 }
 
 console.log('\n— formatação —');
