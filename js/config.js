@@ -49,6 +49,17 @@ export const GPS_TIMEOUT_MS = 25000;  // sem fix nesse tempo → avisa
 export const DEFAULT_STRIDE = 0.78;
 
 /**
+ * Suavização da posição desenhada (ver Game._updateShownDistance).
+ * O GPS entrega ~1 fix por segundo, então a distância real anda aos degraus;
+ * estes valores fazem o cenário rolar em ritmo constante mesmo assim.
+ */
+export const SHOWN_GAIN = 0.2;         // correção suave em cruzeiro
+export const SHOWN_GAIN_CATCHUP = 1.5; // correção forte após um salto grande
+export const SHOWN_CATCHUP_M = 15;     // erro acima disso entra em recuperação
+export const SHOWN_MAX_SPEED = 12;     // m/s — recupera correndo, não teleporta
+export const SHOWN_SNAP_M = 100;       // acima disso ressincroniza direto
+
+/**
  * O celular fica no bolso durante a corrida: o retorno é sonoro e tátil.
  * Avisos a cada quilômetro, na metade e quando o tempo aperta.
  */

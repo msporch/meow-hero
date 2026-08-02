@@ -201,6 +201,36 @@ encenada em coordenadas de tela — senão ele só apareceria nos últimos 5 met
 semeado pela distância). Repetir uma meta é repetir o mesmo caminho, o que
 torna a comparação entre corridas mais justa.
 
+**Distância desenhada ≠ distância medida.** O GPS entrega cerca de um fix por
+segundo, então a distância real anda aos degraus. Medindo uma corrida a 3 m/s,
+o cenário ficava parado em **296 de 300 frames** e então saltava **72 px de uma
+vez** — quase meia tela. Isso se percebe como travamento, mas não é: a tela de
+corrida custa 0,14 ms por frame.
+
+A correção está em `Game._updateShownDistance`. O mundo é desenhado a partir de
+uma distância própria (`shownM`) que avança todo frame na velocidade medida e
+absorve o erro contra a distância real com ganho baixo. Pontuação, HUD, barra
+de progresso e o disparo do final continuam usando a distância verdadeira — a
+suavização é puramente visual. Os ganhos foram calibrados medindo a oscilação
+do avanço em vários cenários (corrida, caminhada, GPS ruim, app suspenso):
+
+| | Antes | Depois |
+|---|---|---|
+| Frames congelados | 296 de 300 | 0 de 180 |
+| Maior salto do cenário | 72 px | 1,4 px |
+| Oscilação do avanço | teleporte | 1,25× |
+
+Três regimes, porque um ganho só não serve para todos: em cruzeiro a correção é
+suave (ritmo constante); acima de 15 m de erro ela sobe, para não arrastar o
+atraso pelo resto da corrida; acima de 100 m — app suspenso por minutos no
+bolso — o cenário ressincroniza direto, já que ninguém viu aquele trecho e um
+sprint de dois minutos seria mais estranho que um corte.
+
+**Dither por padrão, não por pixel.** Desenhar o xadrez de 50% pixel a pixel
+custava 11.520 chamadas de `fillRect` na tela de pausa: **7,2 ms por frame**,
+43% do orçamento de 60fps num desktop e o suficiente para travar num celular.
+Pré-renderizado como padrão de 2×2, virou uma única chamada — 0,20 ms.
+
 **O caminhão como relógio.** Na reta final a posição do caminhão reflete o
 tempo restante: com folga ele nem aparece; faltando pouco, vem em cima do
 gato. Ele para antes de cobrir o gato — quem está em risco precisa continuar

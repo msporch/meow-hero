@@ -7,6 +7,7 @@
 import {
   W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOALS, PACES,
   CHUNK_PX, MILK_SECONDS, CUE_HALFWAY, CUE_LOW_TIME_S,
+  SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
 } from './config.js';
 import { ctx, clear, rect, rectOutline, panel, dither, progressBar } from './gfx.js';
 import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js';
@@ -45,6 +46,10 @@ export class Game {
     this.coins = 0;
     this.timeLeft = 0;
     this.elapsed = 0;
+
+    // Distância usada só para desenhar — ver _updateShownDistance.
+    this.shownM = 0;
+    this._lastCoinSfx = 0;
     this.kmCued = 0;
     this.halfCued = false;
     this.lowTimeCued = false;
@@ -78,12 +83,50 @@ export class Game {
     if (this.toastT > 0) this.toastT -= dt;
 
     this.tracker.tick(dt);
+    this._updateShownDistance(dt);
 
     switch (this.state) {
       case S.ARM: this._updateArm(dt); break;
       case S.RUN: this._updateRun(dt); break;
       case S.FINALE: this._updateFinale(dt); break;
     }
+  }
+
+  /**
+   * Distância usada só para DESENHAR o mundo.
+   *
+   * O GPS entrega cerca de um fix por segundo, então a distância real anda aos
+   * degraus: medindo uma corrida a 3 m/s, o cenário ficava parado em 296 de
+   * 300 frames e então saltava 72 px de uma vez — quase meia tela. É isso que
+   * se percebe como travamento, e não queda de FPS (a tela de corrida custa
+   * 0,14 ms por frame).
+   *
+   * Aqui o mundo anda todo frame na velocidade medida e o erro contra a
+   * distância real é absorvido suavemente. Pontuação, HUD, barra de progresso
+   * e o disparo do final continuam usando a distância verdadeira: isto é
+   * puramente visual.
+   */
+  _updateShownDistance(dt) {
+    const tr = this.tracker;
+    const real = tr.distanceM;
+    const gap = real - this.shownM;
+
+    // Intervalo enorme (app suspenso por minutos, celular no bolso) não vale
+    // animar: ninguém viu aquele trecho, e um sprint de dois minutos seria mais
+    // estranho que um corte. Ressincroniza direto.
+    if (gap > SHOWN_SNAP_M) { this.shownM = real; return; }
+
+    // Ganho baixo mantém a rolagem em ritmo constante entre dois fixes. Só sobe
+    // quando o erro fica grande (app suspenso no bolso, GPS voltando depois de
+    // um túnel) — senão o atraso ficaria sendo arrastado pelo resto da corrida.
+    const gain = Math.abs(gap) > SHOWN_CATCHUP_M ? SHOWN_GAIN_CATCHUP : SHOWN_GAIN;
+
+    // Teto de velocidade: mesmo recuperando, o cenário corre em vez de saltar.
+    const v = Math.min(Math.max(0, tr.speedMs + gap * gain), SHOWN_MAX_SPEED);
+
+    // Projeta no máximo ~2 s além do último fix; parado, o cenário para junto.
+    const ceiling = real + Math.max(2, tr.speedMs * 2);
+    this.shownM = Math.max(this.shownM, Math.min(this.shownM + v * dt, ceiling));
   }
 
   draw() {
@@ -238,6 +281,8 @@ export class Game {
     this.lowTimeCued = false;
     this.saved = false;
     this._collectedTo = 0;
+    this.shownM = 0;
+    this._lastCoinSfx = 0;
     this.tracker.reset();
     this.tracker.stride = store.get('stride') || 0.78;
 
@@ -349,40 +394,25 @@ export class Game {
       sfx.lowTime();
     }
 
-    // Coleta automática: tudo que o herói ultrapassa entra no total.
-    //
-    // A varredura vai do último ponto coletado até a posição atual, não só do
-    // que está na tela: com o app suspenso no bolso, a distância pode dar um
-    // salto grande entre dois frames e as moedas do trecho pulado seriam
-    // perdidas. O limite de chunks por frame evita travar depois de uma pausa
-    // longa — o resto é coletado nos frames seguintes.
-    const worldX = dist * PX_PER_M;
-    const MAX_CHUNKS = 40;
-    const from = Math.max(0, this._collectedTo ?? (worldX - CHUNK_PX));
-    const to = Math.min(worldX, from + MAX_CHUNKS * CHUNK_PX);
+    // Coleta pela posição desenhada, para a moeda sumir quando o herói passa
+    // por ela na tela. O que ficar para trás é recolhido ao fim da corrida.
+    const got = this._collectUpTo(this.shownM);
 
-    for (const c of this.course.visibleChunks(from, to + W)) {
-      for (const it of c.items) {
-        if (it.x <= worldX && !this.course.isTaken(it.id)) {
-          this.course.take(it.id);
-          if (it.type === 'coin') { this.coins++; if (!this.pocket) sfx.coin(); }
-          else if (it.type === 'milk') {
-            this.timeLeft += MILK_SECONDS;
-            if (!this.pocket) sfx.milk();
-            this.say(`+${MILK_SECONDS}s`, 1.6);
-          }
-        }
-      }
+    if (got.coins > 0 && !this.pocket) {
+      // Um salto do GPS pode entregar dezenas de moedas no mesmo frame; sem
+      // limite isso dispararia dezenas de osciladores de uma vez.
+      const now = performance.now();
+      if (now - this._lastCoinSfx > 55) { sfx.coin(); this._lastCoinSfx = now; }
     }
-    this._collectedTo = to;
+    if (got.milk > 0) {
+      if (!this.pocket) sfx.milk();
+      this.say(`+${MILK_SECONDS * got.milk}s`, 1.6);
+    }
 
     // Chegou na meta.
     if (dist >= this.course.goalM) {
       this.saved = this.timeLeft > 0;
-      this.pocket = false;
-      this.finaleT = 0;
-      this.finalePhase = 0;
-      this.go(S.FINALE);
+      this._enterFinale();
       return;
     }
 
@@ -390,11 +420,45 @@ export class Game {
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
       this.saved = false;
-      this.pocket = false;
-      this.finaleT = 0;
-      this.finalePhase = 0;
-      this.go(S.FINALE);
+      this._enterFinale();
     }
+  }
+
+  _enterFinale() {
+    // Recolhe o que sobrou entre a posição desenhada e a distância real.
+    this._collectUpTo(this.tracker.distanceM);
+    this.pocket = false;
+    this.finaleT = 0;
+    this.finalePhase = 0;
+    this.go(S.FINALE);
+  }
+
+  /**
+   * Recolhe moedas e leite até `uptoM` metros, retomando de onde parou.
+   *
+   * A varredura parte do último ponto coletado, e não do que está na tela: com
+   * o app suspenso no bolso a distância pode dar um salto grande entre dois
+   * frames, e o trecho pulado seria perdido. O teto de chunks por frame evita
+   * um pico de trabalho depois de uma suspensão longa — 8 chunks equivalem a
+   * 106 m por frame, ou 6 km por segundo de recuperação.
+   */
+  _collectUpTo(uptoM) {
+    const worldX = uptoM * PX_PER_M;
+    const MAX_CHUNKS = 8;
+    const from = Math.max(0, this._collectedTo ?? 0);
+    const to = Math.min(worldX, from + MAX_CHUNKS * CHUNK_PX);
+    let coins = 0, milk = 0;
+
+    for (const c of this.course.visibleChunks(from, to + W)) {
+      for (const it of c.items) {
+        if (it.x > worldX || this.course.isTaken(it.id)) continue;
+        this.course.take(it.id);
+        if (it.type === 'coin') { this.coins++; coins++; }
+        else if (it.type === 'milk') { this.timeLeft += MILK_SECONDS; milk++; }
+      }
+    }
+    this._collectedTo = to;
+    return { coins, milk };
   }
 
   _inputRun(key) {
@@ -508,7 +572,8 @@ export class Game {
 
   _drawRun() {
     const tr = this.tracker;
-    const worldX = tr.distanceM * PX_PER_M;
+    // Posição suavizada: o mundo rola continuamente mesmo com fixes a cada 1 s.
+    const worldX = this.shownM * PX_PER_M;
 
     // O herói só corre quando o usuário se move de verdade.
     const moving = tr.isMoving;
@@ -599,7 +664,7 @@ export class Game {
   }
 
   _drawFinale() {
-    const worldX = Math.min(this.tracker.distanceM, this.course.goalM) * PX_PER_M;
+    const worldX = Math.min(this.shownM, this.course.goalM) * PX_PER_M;
     const p = this.finalePhase;
 
     if (this.saved) {

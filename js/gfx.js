@@ -42,15 +42,38 @@ export function panel(x, y, w, h) {
   rectOutline(x + 2, y + 2, w - 4, h - 4, 1);
 }
 
+/**
+ * Padrões de xadrez pré-renderizados, um por cor e fase.
+ *
+ * Desenhar o dither pixel a pixel custava ~7 ms por frame em tela cheia
+ * (11.520 chamadas de fillRect na tela de pausa) — 43% do orçamento de 60fps
+ * num desktop, e o suficiente para travar visivelmente num celular. Como
+ * padrão repetido, vira uma única chamada.
+ */
+const ditherCache = new Map();
+
+function ditherPattern(color, phase) {
+  const key = `${color}:${phase & 1}`;
+  const hit = ditherCache.get(key);
+  if (hit) return hit;
+
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = 2;
+  const g = tile.getContext('2d');
+  g.fillStyle = PALETTE[color];
+  const p = phase & 1;
+  g.fillRect(p, 0, 1, 1);
+  g.fillRect(1 - p, 1, 1, 1);
+
+  const pat = ctx.createPattern(tile, 'repeat');
+  ditherCache.set(key, pat);
+  return pat;
+}
+
 /** Padrão xadrez 50% — usado para sombras e gradientes na paleta de 4 cores. */
 export function dither(x, y, w, h, color, phase = 0) {
-  ctx.fillStyle = PALETTE[color];
-  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
-  for (let j = 0; j < h; j++) {
-    for (let i = (j + phase) % 2; i < w; i += 2) {
-      ctx.fillRect(x + i, y + j, 1, 1);
-    }
-  }
+  ctx.fillStyle = ditherPattern(color, phase);
+  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
 }
 
 /** Barra de progresso estilo GB. */
