@@ -122,3 +122,16 @@ export const GHOST_TRACE_S = 5;        // intervalo de amostragem do traçado
 export const GHOST_TRACE_MAX = 900;    // teto de amostras guardadas por corrida
 export const GHOST_PX_PER_M = 4;       // compressão da diferença na tela
 export const GHOST_MAX_OFFSET = 64;    // px — além disso encosta na borda
+
+/**
+ * Multijogador.
+ *
+ * Só a distância relativa circula: o servidor recebe coordenadas para saber
+ * quem está perto, mas devolve apenas metros até o outro e a diferença de
+ * progresso. Nenhuma coordenada chega a outro jogador.
+ */
+export const MP_INTERVAL_MS = 4000;    // frequência de envio da posição
+export const MP_TIMEOUT_MS = 6000;     // desiste da requisição depois disso
+export const MP_STALE_MS = 20000;      // sem resposta por tanto tempo, limpa a cena
+export const MP_MAX_ON_SCREEN = 3;     // vizinhos desenhados ao mesmo tempo
+export const MP_NEAR_M = 400;          // dentro disso encosta no jogador na tela

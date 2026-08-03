@@ -5,6 +5,7 @@ import { drawText } from './font.js';
 import { loadAssets, A } from './assets.js';
 import { initAudio, resumeAudio, setAudioEnabled, sfx } from './audio.js';
 import { Game } from './game.js';
+import { captureServerFromUrl } from './multiplayer.js';
 import * as store from './storage.js';
 
 const canvas = document.getElementById('screen');
@@ -14,6 +15,10 @@ initGfx(canvas);
 clear(3);
 drawText(ctx, 'MEOW HERO', W / 2, 60, 0, 'center');
 drawText(ctx, 'CARREGANDO...', W / 2, 76, 1, 'center');
+
+// Precisa vir antes do jogo: é daqui que sai o endereço do servidor de
+// multijogador, passado uma única vez por ?mp=... na URL.
+captureServerFromUrl();
 
 const game = new Game();
 let ready = false;

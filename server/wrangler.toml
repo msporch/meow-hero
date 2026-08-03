@@ -1,0 +1,17 @@
+# Configuração para implantar o servidor no Cloudflare Workers.
+# Só é necessária quando o multijogador deixar de rodar no PC.
+#
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler deploy
+name = "meow-hero-mp"
+main = "worker.mjs"
+compatibility_date = "2024-09-23"
+
+[[durable_objects.bindings]]
+name = "SALA"
+class_name = "SalaDePresenca"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["SalaDePresenca"]

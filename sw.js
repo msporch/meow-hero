@@ -2,7 +2,7 @@
 // offline (importante: durante a corrida a conexão pode cair).
 // Suba esta versão a cada mudança de código ou asset: o cache é cache-first,
 // então sem isso um app já instalado continuaria servindo os arquivos antigos.
-const VERSION = 'meowhero-v5';
+const VERSION = 'meowhero-v6';
 
 const SHELL = [
   './',
@@ -19,6 +19,7 @@ const SHELL = [
   './js/course.js',
   './js/tracker.js',
   './js/storage.js',
+  './js/multiplayer.js',
   './assets/atlas.json',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',

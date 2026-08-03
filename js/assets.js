@@ -80,6 +80,22 @@ function buildGhost() {
 
   A.anims.ghost_run = { img: cv, fw: src.fw, fh: src.fh, frames: src.frames,
     anchorX: src.anchorX, anchorY: src.anchorY };
+
+  // Outro jogador: silhueta chapada no tom mais escuro. Precisa ser distinta
+  // tanto do jogador (tons cheios) quanto do fantasma (meio-tom).
+  const rv = document.createElement('canvas');
+  rv.width = src.img.width; rv.height = src.img.height;
+  const rg = rv.getContext('2d');
+  rg.imageSmoothingEnabled = false;
+  rg.drawImage(src.img, 0, 0);
+  const rpx = rg.getImageData(0, 0, rv.width, rv.height);
+  for (let i = 0; i < rpx.data.length; i += 4) {
+    if (rpx.data[i + 3] < 128) continue;
+    rpx.data[i] = 0x0f; rpx.data[i + 1] = 0x38; rpx.data[i + 2] = 0x0f;
+  }
+  rg.putImageData(rpx, 0, 0);
+  A.anims.rival_run = { img: rv, fw: src.fw, fh: src.fh, frames: src.frames,
+    anchorX: src.anchorX, anchorY: src.anchorY };
 }
 
 /** Desenha um sprite ancorado pela base (pés) e centro horizontal. */

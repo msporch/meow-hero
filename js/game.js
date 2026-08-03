@@ -9,6 +9,7 @@ import {
   CHUNK_PX, MILK_SECONDS, CUE_HALFWAY, CUE_LOW_TIME_S,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
   GHOST_TRACE_S, GHOST_TRACE_MAX, GHOST_PX_PER_M, GHOST_MAX_OFFSET,
+  MP_MAX_ON_SCREEN, MP_NEAR_M,
 } from './config.js';
 import { ctx, clear, rect, rectOutline, panel, dither, progressBar } from './gfx.js';
 import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js';
@@ -17,10 +18,12 @@ import { Course } from './course.js';
 import { Tracker, MODES, formatTime, formatKmh } from './tracker.js';
 import { sfx, resumeAudio, vibrate } from './audio.js';
 import * as store from './storage.js';
+import { Multiplayer } from './multiplayer.js';
 
 const S = {
   TITLE: 'title', SETUP: 'setup', ARM: 'arm', RUN: 'run',
   PAUSE: 'pause', FINALE: 'finale', RESULT: 'result', HISTORY: 'history',
+  CONSENT: 'consent',
 };
 
 export class Game {
@@ -52,6 +55,10 @@ export class Game {
     this.ghostDeltaM = 0;
     this._trace = [];
     this._traceAt = 0;
+
+    // Multijogador: desligado até haver consentimento explícito.
+    this.mp = new Multiplayer();
+    this.mpOn = store.get('mpConsent') === true && this.mp.configured;
     this.kmCued = 0;
     this.halfCued = false;
     this.lowTimeCued = false;
@@ -158,6 +165,7 @@ export class Game {
     switch (this.state) {
       case S.TITLE: this._drawTitle(); break;
       case S.SETUP: this._drawSetup(); break;
+      case S.CONSENT: this._drawConsent(); break;
       case S.ARM: this._drawArm(); break;
       case S.RUN: this._drawRun(); break;
       case S.PAUSE: this._drawRun(); this._drawPause(); break;
@@ -183,6 +191,7 @@ export class Game {
     switch (this.state) {
       case S.TITLE: return this._inputTitle(key);
       case S.SETUP: return this._inputSetup(key);
+      case S.CONSENT: return this._inputConsent(key);
       case S.ARM: return this._inputArm(key);
       case S.RUN: return this._inputRun(key);
       case S.PAUSE: return this._inputPause(key);
@@ -221,7 +230,7 @@ export class Game {
   // ---------------- CONFIGURAÇÃO ----------------
 
   _inputSetup(key) {
-    const rows = 4;
+    const rows = 5;
     if (key === 'up') { this.setupRow = (this.setupRow + rows - 1) % rows; sfx.select(); }
     else if (key === 'down') { this.setupRow = (this.setupRow + 1) % rows; sfx.select(); }
     else if (key === 'left' || key === 'right') {
@@ -235,9 +244,15 @@ export class Game {
       } else if (this.setupRow === 2) {
         const i = MODES.findIndex(m => m.id === this.mode);
         this.mode = MODES[(i + dir + MODES.length) % MODES.length].id;
-      } else {
+      } else if (this.setupRow === 3) {
         this.ghostOn = !this.ghostOn;
         store.set('ghostOn', this.ghostOn);
+      } else {
+        // Ligar o multijogador passa pela tela de consentimento primeiro:
+        // ele envia a sua posição para um servidor.
+        if (!this.mp.configured) { /* sem servidor: nada a alternar */ }
+        else if (this.mpOn) { this.mpOn = false; store.set('mpConsent', false); }
+        else { this.go(S.CONSENT); return; }
       }
       sfx.select();
     }
@@ -259,27 +274,33 @@ export class Game {
       ['RITMO', `${this.paceMinKm}:00 /KM`],
       ['MODO', mode.label],
       ['FANTASMA', !ghost ? 'SEM REGISTRO' : (this.ghostOn ? 'LIGADO' : 'DESLIGADO')],
+      ['ONLINE', !this.mp.configured ? 'SEM SERVIDOR' : (this.mpOn ? 'LIGADO' : 'DESLIGADO')],
     ];
 
     rows.forEach(([label, value], i) => {
-      const y = 20 + i * 17;
+      const y = 18 + i * 14;
       const on = i === this.setupRow;
-      if (on) { rect(4, y - 3, W - 8, 17, 2); rectOutline(4, y - 3, W - 8, 17, 0); }
+      if (on) { rect(4, y - 3, W - 8, 14, 2); rectOutline(4, y - 3, W - 8, 14, 0); }
       // Texto recuado para as setas piscantes não encostarem nele.
-      drawText(ctx, label, 14, y + 2, 0);
-      drawText(ctx, value, W - 15, y + 2, 0, 'right');
+      drawText(ctx, label, 14, y, 0);
+      drawText(ctx, value, W - 15, y, 0, 'right');
       if (on && Math.floor(this.t * 3) % 2 === 0) {
-        drawText(ctx, '\x08', 7, y + 2, 0);
-        drawText(ctx, '\x03', W - 12, y + 2, 0);
+        drawText(ctx, '\x08', 7, y, 0);
+        drawText(ctx, '\x03', W - 12, y, 0);
       }
     });
 
     // Resumo: a dica acompanha a linha selecionada.
-    const dica = this.setupRow === 3
-      ? (ghost
+    let dica = mode.hint;
+    if (this.setupRow === 3) {
+      dica = ghost
         ? `Seu recorde: ${(ghost.distanceM / 1000).toFixed(2)} km em ${formatTime(ghost.seconds)}.`
-        : 'Termine uma corrida nesta meta para criar seu fantasma.')
-      : mode.hint;
+        : 'Termine uma corrida nesta meta para criar seu fantasma.';
+    } else if (this.setupRow === 4) {
+      dica = !this.mp.configured
+        ? 'Abra o link com ?mp=endereco do servidor para ativar.'
+        : 'Mostra quem esta correndo perto de voce.';
+    }
 
     rect(0, 90, W, 32, 0);
     drawText(ctx, `TEMPO LIMITE ${formatTime(this.limitSeconds)}`, W / 2, 93, 3, 'center');
@@ -287,6 +308,46 @@ export class Game {
       drawText(ctx, l, W / 2, 104 + i * LINE_H, 2, 'center'));
 
     drawText(ctx, 'START COMECA   B VOLTA', W / 2, 130, 0, 'center');
+  }
+
+  // ---------------- CONSENTIMENTO DO MULTIJOGADOR ----------------
+
+  _inputConsent(key) {
+    if (key === 'a' || key === 'start') {
+      this.mpOn = true;
+      store.set('mpConsent', true);
+      sfx.confirm();
+      this.go(S.SETUP);
+    } else if (key === 'b' || key === 'select') {
+      sfx.back();
+      this.go(S.SETUP);
+    }
+  }
+
+  /**
+   * Ligar o online envia a sua localização a um servidor. Isso é dito em
+   * palavras claras antes de qualquer envio, e o padrão é não enviar.
+   */
+  _drawConsent() {
+    clear(3);
+    rect(0, 0, W, 14, 0);
+    drawText(ctx, 'JOGAR ONLINE', W / 2, 4, 3, 'center');
+
+    // wrapText garante que caiba: linhas fixas estouravam os 160px de largura.
+    const texto = [
+      ...wrapText('Para achar quem corre perto, seu celular envia a sua localizacao ao servidor.', W - 10),
+      '',
+      ...wrapText('Os outros NAO veem onde voce esta: so a que distancia, em metros.', W - 10),
+    ];
+    texto.forEach((l, i) => drawText(ctx, l, W / 2, 20 + i * LINE_H, 0, 'center'));
+
+    const srv = this.mp.server.replace(/^https?:\/\//, '');
+    drawText(ctx, 'SERVIDOR', W / 2, 92, 1, 'center');
+    drawText(ctx, srv.slice(0, 26), W / 2, 101, 0, 'center');
+
+    rect(0, H - 24, W, 24, 0);
+    drawText(ctx, 'A  ACEITO', W / 2, H - 20, 3, 'center');
+    drawText(ctx, 'B  NAO, OBRIGADO', W / 2, H - 10, 2, 'center');
   }
 
   // ---------------- ARMAR (permissões / sinal) ----------------
@@ -313,6 +374,9 @@ export class Game {
     this.ghostDeltaM = 0;
     this.tracker.reset();
     this.tracker.stride = store.get('stride') || 0.78;
+
+    // O online só faz sentido com GPS: é a posição que localiza os vizinhos.
+    if (this.mpOn && this.mode === 'steps+gps') this.mp.start(); else this.mp.stop();
 
     this.go(S.ARM);
     await this.tracker.start(this.mode);
@@ -440,6 +504,13 @@ export class Game {
       this.ghostDeltaM = dg == null ? 0 : dg - dist;
     }
 
+    // Multijogador: envia posição e recolhe quem está perto.
+    if (this.mpOn) {
+      this.mp.tick(performance.now(), {
+        position: tr.position, runM: dist, goalKm: this.goalKm,
+      });
+    }
+
     const got = this._collectUpTo(this.shownM);
 
     if (got.coins > 0 && !this.pocket) {
@@ -466,6 +537,12 @@ export class Game {
       this.saved = false;
       this._enterFinale();
     }
+  }
+
+  /** Vizinhos desenhados na cena, os mais próximos primeiro. */
+  get mpVisiveis() {
+    if (!this.mpOn) return [];
+    return this.mp.players.slice(0, MP_MAX_ON_SCREEN);
   }
 
   _enterFinale() {
@@ -520,11 +597,13 @@ export class Game {
   _abandon() {
     sfx.back();
     this.tracker.stop();
+    this.mp.stop();
     this._releaseWakeLock();
     this.saved = false;
     store.recordRun({
       goalKm: this.goalKm, distanceM: this.tracker.distanceM,
       seconds: this.elapsed, coins: this.coins, saved: false, mode: this.mode,
+      trace: this._trace,
     });
     this.go(S.RESULT);
   }
@@ -616,6 +695,21 @@ export class Game {
       const rotulo = `${this.ghostDeltaM > 0 ? '+' : ''}${Math.round(this.ghostDeltaM)}M`;
       drawTextShadow(ctx, rotulo, gx, GROUND_Y - 50, 0, 3, 'center');
     }
+
+    // Outros jogadores correndo por perto. A posição na tela vem de quão perto
+    // estão de você fisicamente; o lado, de quem está à frente na corrida.
+    //
+    // O afastamento mínimo e o empurrão por índice existem porque vários
+    // vizinhos a distâncias parecidas cairiam uns por cima dos outros — e por
+    // cima do herói, quando a distância é quase zero. Os rótulos sobem em
+    // degraus pelo mesmo motivo.
+    this.mpVisiveis.forEach((p, i) => {
+      const longe = Math.min(1, p.distM / MP_NEAR_M);
+      const lado = p.aheadM >= 0 ? 1 : -1;
+      const px = HERO_X + lado * (24 + longe * 40 + i * 7);
+      drawAnim('rival_run', heroFrame + (p.id.charCodeAt(0) % 8), px, GROUND_Y);
+      drawTextShadow(ctx, `${p.distM}M`, px, GROUND_Y - 52 - i * 9, 0, 3, 'center');
+    });
 
     // Herói
     drawAnim(heroAnim, heroFrame, HERO_X, heroY);
@@ -750,6 +844,7 @@ export class Game {
 
   _finish() {
     this.tracker.stop();
+    this.mp.stop();
     this._releaseWakeLock();
     store.recordRun({
       goalKm: this.goalKm, distanceM: this.tracker.distanceM,

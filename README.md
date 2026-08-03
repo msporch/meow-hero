@@ -52,6 +52,62 @@ aberto a tela não apaga.
 
 ---
 
+## Multijogador
+
+Mostra quem está correndo perto de você, como silhuetas na cena — mais perto
+ou mais longe conforme a distância real entre vocês.
+
+### Privacidade
+
+O servidor **recebe** coordenadas (precisa, para saber quem está próximo) mas
+**nunca as devolve**. Cada jogador só descobre a distância em metros até os
+outros e quanto eles estão à frente na corrida. Isso é verificado por teste:
+`test-server.mjs` falha se aparecer qualquer coordenada na resposta.
+
+O recurso vem desligado. Ligar passa por uma tela que diz, em palavras claras,
+o que é enviado — e o padrão continua sendo não enviar. O identificador é
+aleatório, gerado no aparelho, sem ligação com você.
+
+### Rodando o servidor no seu PC
+
+```bash
+npm run mp
+```
+
+Isso sobe o servidor em `http://localhost:3000`. Para o celular alcançar, ele
+precisa estar acessível na internet **por HTTPS** — uma página HTTPS não pode
+chamar `http://`, e seu celular na rua não está na sua rede. A forma que
+funciona é um túnel, que evita abrir porta no roteador e atravessa CGNAT:
+
+```bash
+npx cloudflared tunnel --url http://localhost:3000
+```
+
+Ele devolve uma URL `https://...trycloudflare.com`. Abra o jogo no celular
+passando esse endereço uma vez:
+
+```
+https://msporch.github.io/meow-hero/?mp=https://SEU-TUNEL.trycloudflare.com
+```
+
+O endereço fica guardado e some da barra. Depois é só ligar **ONLINE** na tela
+de preparo.
+
+Limites do PC como servidor: ele precisa estar ligado durante toda a corrida,
+e a URL do túnel gratuito muda a cada reinício.
+
+### Migrando para o Cloudflare (sempre no ar)
+
+A lógica está em `server/core.mjs`, sem nada específico de Node. `server/node.mjs`
+e `server/worker.mjs` são só invólucros. Para deixar no ar sem depender do PC:
+
+```bash
+cd server && npx wrangler deploy
+```
+
+A única diferença é onde o estado mora: no Node é memória do processo; no
+Workers é um Durable Object, porque requisições não compartilham memória.
+
 ## Estrutura
 
 ```
