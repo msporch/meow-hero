@@ -83,7 +83,25 @@ export const SKINS = {
   ninja: skin('ninja', 'ninja in dark outfit with face mask and scarf, agile runner', 'Skin Ninja'),
   robo: skin('robo', 'friendly boxy robot with antenna and glowing eye, running', 'Skin Robo'),
   astro: skin('astro', 'astronaut in a white space suit with round helmet, running', 'Skin Astro'),
-  esqueleto: skin('esqueleto', 'cartoon skeleton wearing a hoodie and sneakers, running', 'Skin Esqueleto'),
+  // Esqueleto de verdade: ossos à mostra, sem roupa nenhuma.
+  esqueleto: skin('esqueleto', 'bare white skeleton with visible ribcage and skull, no clothes, bones only', 'Skin Esqueleto'),
+
+  // Lote 2 — personagens variados, de apelo mais imediato.
+  mago:      skin('mago', 'wizard with pointy hat, long beard and star-covered robe', 'Skin Mago'),
+  gato:      skin('gato', 'humanoid cat with pointed ears, whiskers and long tail, standing on two legs', 'Skin Gato'),
+  cachorro:  skin('cachorro', 'humanoid dog with floppy ears and wagging tail, standing on two legs', 'Skin Cachorro'),
+  dino:      skin('dino', 'small green tyrannosaurus with tiny arms and big tail, standing on two legs', 'Skin Dino'),
+  pirata:    skin('pirata', 'pirate with tricorn hat, eyepatch and long coat', 'Skin Pirata'),
+  cavaleiro: skin('cavaleiro', 'knight in full plate armor with plumed helmet', 'Skin Cavaleiro'),
+  alien:     skin('alien', 'small green alien with big black eyes and antennae', 'Skin Alien'),
+  zumbi:     skin('zumbi', 'cartoon zombie with torn shirt and arms stretched forward', 'Skin Zumbi'),
+  vampiro:   skin('vampiro', 'vampire with slicked hair, fangs and high-collared cape', 'Skin Vampiro'),
+  bombeiro:  skin('bombeiro', 'firefighter in helmet and reflective turnout coat', 'Skin Bombeiro'),
+  chef:      skin('chef', 'chef with tall white hat and apron holding a frying pan', 'Skin Chef'),
+  panda:     skin('panda', 'humanoid panda with round black ears and black eye patches, standing on two legs', 'Skin Panda'),
+  fantasma:  skin('fantasma', 'cute floating ghost with a white sheet body and round eyes', 'Skin Fantasma'),
+  robo_ouro: skin('robo_ouro', 'shiny golden robot with crown and glowing visor', 'Skin Robo de Ouro'),
+  banana:    skin('banana', 'person wearing a full banana costume with the peel open at the top', 'Skin Banana'),
 };
 
 // As skins entram no mesmo pipeline dos personagens.

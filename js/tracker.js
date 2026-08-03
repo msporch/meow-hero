@@ -118,6 +118,10 @@ export class Tracker {
 
   stop() {
     this.running = false;
+    // Sem isto o estado de movimento ficaria congelado em "andando", e o
+    // cenário continuaria rolando depois do fim da corrida.
+    this.moving = false;
+    this._cadenceSpeed = 0;
     if (this._watchId !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(this._watchId);
       this._watchId = null;

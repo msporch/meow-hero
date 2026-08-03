@@ -8,6 +8,9 @@ const EMPTY = {
   bestKm: 0,
   totalKm: 0,
   audio: true,
+  haptics: true,
+  cuesKm: true,          // bipe e vibração a cada quilômetro
+  pocketDelay: 20,       // segundos sem toque até a tela apagar
   scanlines: true,
   stride: 0.78,
   nome: '',              // nome do jogador, escolhido na primeira abertura

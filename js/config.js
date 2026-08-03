@@ -117,6 +117,17 @@ export const SPEED_SAMPLE_MS = 250;
 /** Passada padrão quando o usuário não informa a altura (m). */
 export const DEFAULT_STRIDE = 0.78;
 
+/** Faixa da passada ajustável no perfil. */
+export const STRIDE_STEP = 0.02;
+
+/** Tempo sem toque até a tela apagar durante a corrida. */
+export const POCKET_DELAYS = [
+  { id: 10, label: '10 S' },
+  { id: 20, label: '20 S' },
+  { id: 60, label: '60 S' },
+  { id: 0,  label: 'NUNCA' },
+];
+
 /**
  * Suavização da posição desenhada (ver Game._updateShownDistance).
  * O GPS entrega ~1 fix por segundo, então a distância real anda aos degraus;

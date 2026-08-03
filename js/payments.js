@@ -17,5 +17,7 @@
  */
 export const PAY_LINKS = {
   astro: '',
+  fantasma: '',
   esqueleto: '',
+  robo_ouro: '',
 };

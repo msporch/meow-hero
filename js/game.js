@@ -8,7 +8,7 @@
 // limite nem derrota: o cronômetro conta para cima e serve de registro.
 import {
   W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOAL_MIN, GOAL_MAX, stepGoal,
-  CHUNK_PX, MILK_COINS, CUE_HALFWAY,
+  CHUNK_PX, MILK_COINS, CUE_HALFWAY, POCKET_DELAYS, STRIDE_MIN, STRIDE_MAX, STRIDE_STEP,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
   MP_MAX_ON_SCREEN,
 } from './config.js';
@@ -17,7 +17,7 @@ import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js
 import { A, drawSprite, drawAnim, drawGround, spriteSize } from './assets.js';
 import { Course } from './course.js';
 import { Tracker, MODES, formatTime, formatKmh } from './tracker.js';
-import { sfx, resumeAudio, vibrate, setAudioEnabled } from './audio.js';
+import { sfx, resumeAudio, vibrate, setAudioEnabled, setHapticsEnabled } from './audio.js';
 import * as store from './storage.js';
 import { Multiplayer } from './multiplayer.js';
 import * as skins from './skins.js';
@@ -29,7 +29,7 @@ const S = {
   CONSENT: 'consent',
   // Menu em subseções: principal → modo → meta → opções → correr.
   NOME: 'nome', PRINCIPAL: 'principal', MODO: 'modo', META: 'meta', OPCOES: 'opcoes',
-  LOJA: 'loja',
+  LOJA: 'loja', PERFIL: 'perfil',
 };
 
 /** Grade de caracteres da tela de nome, no espírito dos jogos da época. */
@@ -59,6 +59,9 @@ export class Game {
     this.nome = store.get('nome') || '';
     this.nomeSel = 0;
     this.lojaSel = 0;
+    this.perfilSel = 0;
+    this.zerarArmado = false;
+    this.zerarEm = 0;
 
     this.coins = 0;
     this.elapsed = 0;
@@ -101,6 +104,18 @@ export class Game {
   }
 
   say(msg, secs = 2) { this.toast = msg; this.toastT = secs; }
+
+  /**
+   * Prefixo de animação da skin equipada, com volta ao padrão.
+   *
+   * O catálogo pode listar uma skin cujo sprite ainda não esteja no atlas
+   * (asset em geração, download incompleto). Sem esta checagem o herói
+   * simplesmente não seria desenhado.
+   */
+  _pele() {
+    const p = skins.equipped().anim;
+    return A.anims[`${p}_run`] ? p : 'hero';
+  }
 
   update(dt) {
     this.t += dt;
@@ -177,6 +192,7 @@ export class Game {
       case S.NOME: this._drawNome(); break;
       case S.PRINCIPAL: this._drawPrincipal(); break;
       case S.LOJA: this._drawLoja(); break;
+      case S.PERFIL: this._drawPerfil(); break;
       case S.MODO: this._drawModo(); break;
       case S.META: this._drawMeta(); break;
       case S.OPCOES: this._drawOpcoes(); break;
@@ -208,6 +224,7 @@ export class Game {
       case S.NOME: return this._inputNome(key);
       case S.PRINCIPAL: return this._inputPrincipal(key);
       case S.LOJA: return this._inputLoja(key);
+      case S.PERFIL: return this._inputPerfil(key);
       case S.MODO: return this._inputModo(key);
       case S.META: return this._inputMeta(key);
       case S.OPCOES: return this._inputOpcoes(key);
@@ -216,7 +233,7 @@ export class Game {
       case S.RUN: return this._inputRun(key);
       case S.PAUSE: return this._inputPause(key);
       case S.RESULT: return this._inputResult(key);
-      case S.HISTORY: if (key === 'b' || key === 'a' || key === 'start') { sfx.back(); this.row = 3; this.go(S.PRINCIPAL); } return;
+      case S.HISTORY: if (key === 'b' || key === 'a' || key === 'start') { sfx.back(); this.go(S.PERFIL); } return;
       case S.FINALE: return;
     }
   }
@@ -268,7 +285,7 @@ export class Game {
     this.mp.name = limpo;
     sfx.confirm();
     this.row = 0;
-    this.go(S.PRINCIPAL);
+    this.go(this.veioDoPerfil ? S.PERFIL : S.PRINCIPAL);
   }
 
   _drawNome() {
@@ -307,8 +324,7 @@ export class Game {
     return [
       { id: 'jogar', label: 'JOGAR', hint: 'Escolha o modo e a meta.' },
       { id: 'loja', label: 'LOJA', hint: 'Skins novas para o seu corredor.' },
-      { id: 'nome', label: 'NOME', hint: `Voce e ${this.nome || '???'}.` },
-      { id: 'hist', label: 'HISTORICO', hint: 'Suas corridas anteriores.' },
+      { id: 'perfil', label: 'PERFIL', hint: 'Seus numeros, ajustes e corridas.' },
     ];
   }
 
@@ -319,10 +335,140 @@ export class Game {
         this.row = 0;
         if (it.id === 'jogar') this.go(S.MODO);
         else if (it.id === 'loja') { this.lojaSel = 0; this.go(S.LOJA); }
-        else if (it.id === 'nome') { this.nomeSel = 0; this.go(S.NOME); }
-        else this.go(S.HISTORY);
+        else { this.perfilSel = 0; this.go(S.PERFIL); }
       },
     });
+  }
+
+  // ---------------- PERFIL ----------------
+
+  /**
+   * Perfil reúne o que antes eram duas entradas soltas (nome e histórico) e
+   * acrescenta os ajustes que importam para um jogo de corrida: passada, que
+   * define a distância quando não há GPS; avisos por quilômetro e vibração,
+   * que são o único retorno com o celular no bolso; e o tempo até a tela
+   * apagar, que é bateria.
+   */
+  _itensPerfil() {
+    const d = store.load();
+    const pocket = POCKET_DELAYS.find(p => p.id === d.pocketDelay) ?? POCKET_DELAYS[1];
+    return [
+      { id: 'nome', label: 'NOME', value: this.nome || '---',
+        hint: 'Aparece sobre voce no multijogador.' },
+      { id: 'passada', label: 'PASSADA', value: `${(d.stride ?? 0.78).toFixed(2)}M`,
+        hint: 'Usada sem GPS. Com GPS se corrige sozinha.' },
+      { id: 'cues', label: 'AVISOS KM', value: d.cuesKm === false ? 'NAO' : 'SIM',
+        hint: 'Bipe e vibracao a cada quilometro completado.' },
+      { id: 'vibra', label: 'VIBRACAO', value: d.haptics === false ? 'NAO' : 'SIM',
+        hint: 'Retorno tatil, separado do som.' },
+      { id: 'som', label: 'SOM', value: d.audio === false ? 'NAO' : 'SIM',
+        hint: 'Bipes do jogo.' },
+      { id: 'bolso', label: 'APAGA TELA', value: pocket.label,
+        hint: 'Tempo sem toque ate a tela apagar.' },
+      { id: 'hist', label: 'HISTORICO', hint: 'Suas corridas anteriores.' },
+      { id: 'zerar', label: 'ZERAR TUDO', hint: 'Apaga moedas, skins e historico.' },
+    ];
+  }
+
+  _inputPerfil(key) {
+    const itens = this._itensPerfil();
+    const n = itens.length;
+
+    if (key === 'up') { this.perfilSel = (this.perfilSel + n - 1) % n; sfx.select(); return; }
+    if (key === 'down') { this.perfilSel = (this.perfilSel + 1) % n; sfx.select(); return; }
+    if (key === 'b') { sfx.back(); this.row = 2; this.go(S.PRINCIPAL); return; }
+
+    const it = itens[this.perfilSel];
+    const dir = key === 'right' ? 1 : key === 'left' ? -1 : 0;
+
+    if (dir !== 0) {
+      if (it.id === 'passada') {
+        const v = Math.min(STRIDE_MAX, Math.max(STRIDE_MIN,
+          (store.get('stride') ?? 0.78) + dir * STRIDE_STEP));
+        store.set('stride', Number(v.toFixed(2)));
+      } else if (it.id === 'cues') {
+        store.set('cuesKm', store.get('cuesKm') === false);
+      } else if (it.id === 'vibra') {
+        const v = store.get('haptics') === false;
+        store.set('haptics', v); setHapticsEnabled(v);
+      } else if (it.id === 'som') {
+        const v = store.get('audio') === false;
+        store.set('audio', v); setAudioEnabled(v);
+      } else if (it.id === 'bolso') {
+        const i = POCKET_DELAYS.findIndex(p => p.id === store.get('pocketDelay'));
+        const alvo = POCKET_DELAYS[((i < 0 ? 1 : i) + dir + POCKET_DELAYS.length) % POCKET_DELAYS.length];
+        store.set('pocketDelay', alvo.id);
+      } else { sfx.back(); return; }
+      sfx.select();
+      return;
+    }
+
+    if (key === 'a' || key === 'start' || key === 'tap') {
+      if (it.id === 'nome') { this.nomeSel = 0; this.veioDoPerfil = true; sfx.confirm(); this.go(S.NOME); }
+      else if (it.id === 'hist') { sfx.confirm(); this.go(S.HISTORY); }
+      else if (it.id === 'zerar') this._zerarTudo();
+      else sfx.back();
+    }
+  }
+
+  /** Apagar tudo pede dois toques seguidos: por engano seria irreversível. */
+  _zerarTudo() {
+    const agora = performance.now();
+    if (this.zerarArmado && agora - this.zerarEm < 4000) {
+      store.resetAll();
+      this.nome = '';
+      this.mp.name = '';
+      this.zerarArmado = false;
+      setAudioEnabled(true);
+      setHapticsEnabled(true);
+      this.say('TUDO APAGADO', 2.5);
+      sfx.lose();
+      return;
+    }
+    this.zerarArmado = true;
+    this.zerarEm = agora;
+    this.say('APERTE A DE NOVO', 3.5);
+    sfx.back();
+  }
+
+  _drawPerfil() {
+    clear(3);
+    rect(0, 0, W, 14, 0);
+    drawText(ctx, 'PERFIL', W / 2, 4, 3, 'center');
+
+    const d = store.load();
+    // Números primeiro: é o que a pessoa vem ver.
+    rect(0, 14, W, 19, 1);
+    drawText(ctx, `\x05${d.coins}`, 4, 17, 3);
+    drawText(ctx, `${d.totalKm.toFixed(1)}KM`, W - 4, 17, 3, 'right');
+    drawText(ctx, `\x02${d.completadas} CORRIDAS`, 4, 25, 3);
+    drawText(ctx, `REC ${d.bestKm.toFixed(1)}KM`, W - 4, 25, 3, 'right');
+
+    const itens = this._itensPerfil();
+    const VIS = 6, n = itens.length;
+    const ini = Math.min(Math.max(0, this.perfilSel - 2), Math.max(0, n - VIS));
+
+    for (let i = 0; i < Math.min(VIS, n); i++) {
+      const idx = ini + i;
+      const it = itens[idx];
+      const y = 38 + i * 12;
+      const on = idx === this.perfilSel;
+      if (on) { rect(3, y - 3, W - 6, 12, 2); rectOutline(3, y - 3, W - 6, 12, 0); }
+      drawText(ctx, it.label, 8, y, 0);
+      if (it.value != null) drawText(ctx, it.value, W - 14, y, 0, 'right');
+      else if (on) drawText(ctx, '\x03', W - 12, y, 0);
+      if (on && it.value != null && Math.floor(this.t * 3) % 2 === 0) {
+        drawText(ctx, '\x08', W - 10, y, 0);
+      }
+    }
+
+    if (ini > 0) drawText(ctx, '\x02', W - 6, 38, 1);
+    if (ini + VIS < n) drawText(ctx, '\x02', W - 6, 38 + (VIS - 1) * 12, 1);
+
+    rect(0, 112, W, 32, 0);
+    wrapText(itens[this.perfilSel]?.hint || '', W - 10).slice(0, 2)
+      .forEach((l, i) => drawText(ctx, l, W / 2, 115 + i * LINE_H, 2, 'center'));
+    drawText(ctx, 'B VOLTA', W / 2, 134, 3, 'center');
   }
 
   _drawPrincipal() {
@@ -338,7 +484,7 @@ export class Game {
       sfx.confirm();
       this.row = 0;
       // Sem nome ainda: pede antes de qualquer outra coisa.
-      if (!this.nome) { this.nomeSel = 0; this.go(S.NOME); } else this.go(S.PRINCIPAL);
+      if (!this.nome) { this.nomeSel = 0; this.veioDoPerfil = false; this.go(S.NOME); } else this.go(S.PRINCIPAL);
     }
   }
 
@@ -479,10 +625,13 @@ export class Game {
 
     // Prévia da skin selecionada, correndo.
     const sel = SKINS[this.lojaSel];
-    drawAnim(`${sel.anim}_run`, Math.floor(this.t * 10), 34, 104)
-      || drawAnim('hero_run', Math.floor(this.t * 10), 34, 104);
+    const temSprite = !!A.anims[`${sel.anim}_run`];
+    if (temSprite) drawAnim(`${sel.anim}_run`, Math.floor(this.t * 10), 34, 104);
+    else drawText(ctx, '?', 34, 90, 1, 'center');
 
-    const info = skins.isOwned(sel.id)
+    const info = !temSprite
+      ? 'Skin ainda nao disponivel nesta versao.'
+      : skins.isOwned(sel.id)
       ? sel.desc
       : sel.coins != null
         ? `${sel.desc} Custa ${sel.coins} moedas.`
@@ -595,8 +744,6 @@ export class Game {
     const mode = MODES.find(m => m.id === this.mode) ?? MODES[0];
     return [
       { id: 'rastreio', label: 'RASTREIO', value: mode.label, hint: mode.hint },
-      { id: 'som', label: 'SOM', value: store.get('audio') === false ? 'DESLIGADO' : 'LIGADO',
-        hint: 'Avisos por bipe a cada quilometro.' },
       { id: 'comecar', label: 'COMECAR', hint: 'Bora correr.' },
     ];
   }
@@ -610,10 +757,6 @@ export class Game {
           const i = MODES.findIndex(m => m.id === this.mode);
           this.mode = MODES[(i + dir + MODES.length) % MODES.length].id;
           store.set('lastMode', this.mode);
-        } else if (it.id === 'som') {
-          const novo = store.get('audio') === false;
-          store.set('audio', novo);
-          setAudioEnabled(novo);
         }
       },
       // START começa de qualquer linha; A só começa em cima de COMECAR.
@@ -763,7 +906,7 @@ export class Game {
 
     // Animação de espera: o herói correndo no lugar.
     const f = Math.floor(this.t * 10);
-    drawAnim(`${skins.equipped().anim}_run`, f, W / 2, 104);
+    drawAnim(`${this._pele()}_run`, f, W / 2, 104);
 
     const dots = '.'.repeat(1 + (Math.floor(this.t * 2) % 3));
     if (st === 'denied' || st === 'error') {
@@ -785,7 +928,9 @@ export class Game {
 
     // Entra em modo bolso após um tempo sem toque — é o uso previsto.
     // Com o diagnóstico aberto não apaga: a tela existe para ser observada.
-    if (!this.pocket && !this.debug && performance.now() - this.lastTouch > 20000) {
+    const atraso = store.get('pocketDelay');
+    if (!this.pocket && !this.debug && atraso > 0
+        && performance.now() - this.lastTouch > atraso * 1000) {
       this.pocket = true;
     }
 
@@ -793,7 +938,10 @@ export class Game {
 
     // Avisos sonoros/táteis: a única forma de retorno com o celular no bolso.
     const kmNow = Math.floor(dist / 1000);
-    if (kmNow > this.kmCued) { this.kmCued = kmNow; sfx.km(kmNow); }
+    if (kmNow > this.kmCued) {
+      this.kmCued = kmNow;
+      if (store.get('cuesKm') !== false) sfx.km(kmNow);
+    }
 
     if (CUE_HALFWAY && !this.halfCued && dist >= this.course.goalM / 2) {
       this.halfCued = true;
@@ -835,6 +983,12 @@ export class Game {
   _enterFinale() {
     // Recolhe o que sobrou entre a posição desenhada e a distância real.
     this._collectUpTo(this.tracker.distanceM);
+
+    // A corrida acaba na linha de chegada. Sem parar o rastreio aqui, os ~5 s
+    // da comemoração continuavam somando distância — numa meta de 200 m o
+    // resultado saía com 215 m. Vale para todos os modos: no DEMO o simulador
+    // segue gerando passos, no GPS/PASSOS a pessoa segue andando.
+    this.tracker.stop();
     this.pocket = false;
     this.finaleT = 0;
     this.finalePhase = 0;
@@ -974,7 +1128,7 @@ export class Game {
     // passo detectado e só desliga após alguns segundos parado de verdade.
     const moving = tr.moving;
     const cadence = Math.min(18, 5 + tr.displaySpeedMs * 3.2);
-    const pele = skins.equipped().anim;
+    const pele = this._pele();
     const anim = moving ? `${pele}_run` : `${pele}_idle`;
     const frame = moving ? Math.floor(this.elapsed * cadence) : Math.floor(this.elapsed * 3);
 
@@ -1081,7 +1235,7 @@ export class Game {
   _drawFinale() {
     const worldX = Math.min(this.shownM, this.course.goalM) * PX_PER_M;
     const p = this.finalePhase;
-    const pele = skins.equipped().anim;
+    const pele = this._pele();
 
     const chegando = p === 0;
     this._drawWorld(worldX, {
@@ -1129,9 +1283,9 @@ export class Game {
     });
 
     // O gato fica na faixa livre entre os números e a barra, sem cobrir texto.
-    // No lugar do gato, a skin que você usou nesta corrida.
-    const pele = skins.equipped().anim;
-    drawAnim(`${pele}_${this.chegou ? 'run' : 'idle'}`, Math.floor(this.t * 8), W / 2, 94);
+    // A skin usada na corrida, parada: ela já terminou.
+    const pele = this._pele();
+    drawAnim(`${pele}_idle`, Math.floor(this.t * 4), W / 2, 94);
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
     progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);

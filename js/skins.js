@@ -6,19 +6,53 @@
 import * as store from './storage.js';
 import { PAY_LINKS } from './payments.js';
 
+/**
+ * Ordenadas por preço, das baratas para as caras — é como a loja se lê melhor.
+ * Cada skin é um personagem próprio gerado com os mesmos parâmetros do padrão.
+ */
 export const SKINS = [
   { id: 'padrao',    nome: 'CLASSICO',  anim: 'hero',      coins: 0,
     desc: 'O corredor de sempre.' },
-  { id: 'neon',      nome: 'NEON',      anim: 'neon',      coins: 400,
+  { id: 'neon',      nome: 'NEON',      anim: 'neon',      coins: 300,
     desc: 'Corta a noite com faixas refletivas.' },
+  { id: 'chef',      nome: 'CHEF',      anim: 'chef',      coins: 500,
+    desc: 'Corre com a frigideira na mao.' },
+  { id: 'bombeiro',  nome: 'BOMBEIRO',  anim: 'bombeiro',  coins: 700,
+    desc: 'Sempre com pressa.' },
+  { id: 'pirata',    nome: 'PIRATA',    anim: 'pirata',    coins: 900,
+    desc: 'Atras do proximo bau.' },
+  { id: 'gato',      nome: 'GATO',      anim: 'gato',      coins: 1200,
+    desc: 'Sete vidas, uma so meta.' },
+  { id: 'cachorro',  nome: 'CACHORRO',  anim: 'cachorro',  coins: 1200,
+    desc: 'Melhor parceiro de corrida.' },
   { id: 'ninja',     nome: 'NINJA',     anim: 'ninja',     coins: 1500,
     desc: 'Silencioso e rapido.' },
+  { id: 'zumbi',     nome: 'ZUMBI',     anim: 'zumbi',     coins: 1800,
+    desc: 'Lento? Nem sempre.' },
+  { id: 'panda',     nome: 'PANDA',     anim: 'panda',     coins: 2200,
+    desc: 'Fofo e imparavel.' },
+  { id: 'mago',      nome: 'MAGO',      anim: 'mago',      coins: 2600,
+    desc: 'Corre porque nao sabe teleportar.' },
+  { id: 'alien',     nome: 'ALIEN',     anim: 'alien',     coins: 3000,
+    desc: 'Veio de longe so pra correr.' },
+  { id: 'cavaleiro', nome: 'CAVALEIRO', anim: 'cavaleiro', coins: 3400,
+    desc: 'Armadura completa. Coragem tambem.' },
   { id: 'robo',      nome: 'ROBO',      anim: 'robo',      coins: 4000,
     desc: 'Nao cansa. Nunca.' },
+  { id: 'vampiro',   nome: 'VAMPIRO',   anim: 'vampiro',   coins: 4500,
+    desc: 'Prefere o turno da noite.' },
+  { id: 'dino',      nome: 'DINO',      anim: 'dino',      coins: 5500,
+    desc: 'Bracinhos curtos, pernas longas.' },
+  { id: 'banana',    nome: 'BANANA',    anim: 'banana',    coins: 7000,
+    desc: 'Ninguem sabe por que. Funciona.' },
   { id: 'astro',     nome: 'ASTRO',     anim: 'astro',     brl: 4.90,
     desc: 'Gravidade e so um detalhe.' },
+  { id: 'fantasma',  nome: 'FANTASMA',  anim: 'fantasma',  brl: 6.90,
+    desc: 'Atravessa tudo, menos a meta.' },
   { id: 'esqueleto', nome: 'ESQUELETO', anim: 'esqueleto', brl: 9.90,
     desc: 'Ossos que nao param.' },
+  { id: 'robo_ouro', nome: 'ROBO OURO', anim: 'robo_ouro', brl: 14.90,
+    desc: 'A versao que ninguem precisava.' },
 ];
 
 export const skinById = id => SKINS.find(s => s.id === id) ?? SKINS[0];

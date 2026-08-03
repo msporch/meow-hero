@@ -4,6 +4,7 @@
 let actx = null;
 let master = null;
 let enabled = true;
+let hapticsOn = true;
 
 export function initAudio() {
   if (actx) return actx;
@@ -24,6 +25,13 @@ export function resumeAudio() {
 
 export function setAudioEnabled(v) { enabled = v; }
 export function isAudioEnabled() { return enabled; }
+
+/**
+ * Vibração é controlada à parte do som: com o celular no bolso, muita gente
+ * quer o retorno tátil sem barulho — ou o contrário, correndo com fone.
+ */
+export function setHapticsEnabled(v) { hapticsOn = v; }
+export function isHapticsEnabled() { return hapticsOn; }
 
 /** Um bip de onda quadrada. */
 function beep(freq, dur, { type = 'square', vol = 1, delay = 0, slideTo = null } = {}) {
@@ -54,7 +62,7 @@ function seq(notes) {
 }
 
 export function vibrate(pattern) {
-  if (!enabled) return;
+  if (!hapticsOn) return;
   try { navigator.vibrate?.(pattern); } catch { /* sem suporte */ }
 }
 

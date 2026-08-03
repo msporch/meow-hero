@@ -3,7 +3,7 @@ import { W, H } from './config.js';
 import { initGfx, ctx, clear } from './gfx.js';
 import { drawText } from './font.js';
 import { loadAssets, A } from './assets.js';
-import { initAudio, resumeAudio, setAudioEnabled, sfx } from './audio.js';
+import { initAudio, resumeAudio, setAudioEnabled, setHapticsEnabled, sfx } from './audio.js';
 import { Game } from './game.js';
 import { captureServerFromUrl } from './multiplayer.js';
 import * as store from './storage.js';
@@ -118,6 +118,7 @@ function frame(now) {
   await loadAssets();
   initAudio();
   setAudioEnabled(store.get('audio') !== false);
+  setHapticsEnabled(store.get('haptics') !== false);
   if (store.get('scanlines') === false) document.body.classList.add('no-scanlines');
 
   if (A.missing.length) {
