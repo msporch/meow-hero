@@ -1,0 +1,29 @@
+{
+  "ids": {
+    "base": "678f8015-f1af-4be3-b23e-c13dec135706",
+    "ninja": "06b0df91-5b2a-45f5-ad84-ffa35dc00f0d",
+    "chef": "8afe0018-0078-491a-9cf2-e5c755776a04",
+    "astro": "a915a5b7-3255-4fee-ab56-381be712ba9f",
+    "neon": "a4e59481-b7b3-41f2-9d07-b914baaf5e8d",
+    "pirata": "c3dd8723-62b4-45b5-8fd6-0bcf261f5bb4",
+    "cavaleiro": "c6e9ae33-c7fb-4810-ad28-39c1597a4674",
+    "bombeiro": "565039dc-6b2c-4b68-99a5-0f735680f485",
+    "mago": "bbf29fce-5183-4111-a1ab-86dcf54483de",
+    "vampiro": "965f0518-cb2f-44bc-83f3-e8bb87df3e33",
+    "banana": "e3ac63d5-9267-40eb-bb82-4fb9e9fb3419",
+    "zumbi": "1e38fb2e-e42b-4712-9ef2-396abff6831c",
+    "gato": "5c61c3b6-829a-4f96-829c-49e078cc3f99",
+    "cachorro": "84e500db-6f57-453a-979b-8210c530654b",
+    "dino": "1d78d0d0-54c8-4815-8930-03e4805cf031",
+    "alien": "84f1d7f7-38b2-4ee4-87a9-a6241ffc6623",
+    "robo": "d146191b-cca6-4960-93e9-604147edae58",
+    "robo_ouro": "c5330ce5-d290-4877-8006-d40adba721c3",
+    "esqueleto": "f80b1c76-d84d-4de0-b4a8-68ae9f15bdbc",
+    "fantasma": "3cefdd67-08fd-48f7-a4ee-8ba564722ce4",
+    "panda": "a91c565a-ec7c-4df9-87bf-5659910ae7cb",
+    "fantasma_reprovado": "b6164758-efb3-4ed1-90cb-1279f611c3c2",
+    "pirata_reprovado": "533fe74f-b272-4e23-817d-27478471046b",
+    "neon_reprovado": "c05525cc-8db3-4945-9824-f6725f92c161",
+    "robo_ouro_reprovado": "6c6a3852-a2fd-4744-a2aa-7197030bd40c"
+  }
+}

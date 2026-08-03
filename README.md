@@ -1,6 +1,6 @@
 # Meow Hero
 
-Endless runner 2D com visual de Game Boy, instalável no celular, em que o
+Endless runner 2D com visual de Game Boy Advance, instalável no celular, em que o
 personagem só avança quando **você se move de verdade no mundo real**.
 
 Você escolhe uma meta (por exemplo 6 km), guarda o celular no bolso e corre. O
@@ -182,7 +182,7 @@ sw.js                   service worker (cache offline)
 css/style.css           carcaça do console, escala e responsividade
 js/
   config.js             constantes (paleta, escala, filtros de GPS)
-  gfx.js                canvas 160x144, blit, primitivas na paleta DMG
+  gfx.js                canvas 160x144, blit, primitivas na paleta indexada
   font.js               fonte bitmap 5x7 desenhada à mão
   assets.js             carrega atlas.json e desenha sprites/animações
   audio.js              bipes de onda quadrada + vibração
@@ -196,11 +196,16 @@ js/
   main.js               entrada, input, loop, instalação
 assets/
   atlas.json            metadados dos sprites (tamanho, âncoras, frames)
-  sprites/*.png         arte final, já na paleta de 4 tons
+  sprites/*.png         arte final da v2
   icons/                ícones do PWA
-  _raw/                 saída crua do PixelLab (não versionada)
-tools/                  pipeline de geração de assets e testes
+  _v2raw/               saída crua do PixelLab, v2 (não versionada)
+  _gba/                 saída do demake antes de instalar (não versionada)
+  _qa/                  folhas de contato da inspeção (não versionada)
+tools/                  pipeline v1 (Game Boy DMG) e testes
+tools/v2/               pipeline v2 (Game Boy Advance) — ver STYLE-BIBLE.md
 ```
+
+A versão anterior, em 4 tons de verde, está preservada na tag `v1-gameboy`.
 
 ---
 
@@ -273,47 +278,71 @@ ligada (o wake lock cuida disso).
 
 ## Pipeline de assets (MCP do PixelLab)
 
-Toda a arte vem do PixelLab e passa por um "demake" que a converte para as
-4 cores do Game Boy original.
+Toda a arte vem do PixelLab. Os parâmetros travados, a paleta e as regras estão
+em **[STYLE-BIBLE.md](STYLE-BIBLE.md)** — cada geração copia de lá, literalmente.
 
 ```bash
-node tools/gen-assets.mjs      # enfileira personagens, sprites, cenários, tileset
-node tools/gen-anims.mjs       # enfileira as animações dos personagens
-node tools/fetch-assets.mjs    # baixa o que já ficou pronto
-node tools/demake.mjs          # quantiza, recorta, empacota, gera atlas.json
-node tools/wait-assets.mjs     # espera tudo terminar e já aplica o demake
+node tools/v2/produzir.mjs     # roupas → criaturas → animações
+node tools/v2/cenario.mjs      # props, camadas de fundo, tela de título, tileset
+node tools/v2/baixar.mjs       # baixa o que ficou pronto → assets/_v2raw/
+node tools/v2/qa.mjs           # checagem técnica + folhas de contato
+node tools/v2/demake-gba.mjs   # reduz paleta, recorta, monta atlas → assets/_gba/
+node tools/v2/instalar.mjs     # copia para assets/, conferindo se falta peça
+node tools/v2/refazer.mjs <skin>   # refaz uma skin reprovada na inspeção
 ```
 
-O token fica em `tools/.pixellab-token` (fora do controle de versão) ou na
-variável `PIXELLAB_TOKEN`.
+Todos são retomáveis: nada é recriado se já existe e está pronto. O token fica
+em `tools/.pixellab-token` (fora do controle de versão) ou em `PIXELLAB_TOKEN`.
 
-### O que o `demake.mjs` faz
+### Consistência entre skins
 
-O PixelLab entrega pixel art colorida, em canvas grandes. Para virar Game Boy:
+Este foi o problema central da v1. Vinte `create_character` independentes com o
+**mesmo prompt** devolviam vinte pessoas diferentes — outro rosto, outra
+compleição, outro tênis. Na v2, skin que é "a mesma pessoa com outra roupa"
+nasce de `create_character_state` a partir do herói base, que preserva
+identidade, corpo e proporções. Só criaturas de verdade (gato, robô, esqueleto)
+usam `create_character`.
 
-1. **Quantização** para os 4 tons da paleta DMG (`#0f380f`, `#306230`,
-   `#8bac0f`, `#9bbc0f`), por luminância com esticamento de contraste. Cenários
-   levam dither ordenado (Bayer 4×4); sprites não, para não sujar o contorno.
-2. **Recorte** pela caixa delimitadora — unida entre todos os frames de uma
-   animação, para o movimento não "pular".
-3. **Redução** por divisor inteiro, escolhendo a cor dominante de cada bloco
-   (empate vai para a cor mais escura, o que preserva os contornos).
-4. **Hierarquia tonal**: as camadas de fundo são achatadas num único tom claro
-   e a mais distante recebe meio-tom xadrez. Com só 4 cores, é isso que
-   garante que o herói (que tem contorno no tom mais escuro) sempre se
-   destaque — sem esse passo ele desaparece dentro dos prédios.
-5. **Chão**: monta uma faixa de 16×28 combinando o tile de calçada com o de
+### O que o `demake-gba.mjs` faz
+
+A v1 quantizava tudo para 4 tons de verde. Em cor o trabalho é o oposto:
+reduzir o ruído do gerador a uma paleta enxuta, sem inventar cor.
+
+1. **Corte mediano** para no máximo 16 cores por sprite (24 por camada de
+   cenário, 48 na arte de título), preservando as cores de identidade — mapear
+   para uma paleta fixa apagaria o vermelho do bombeiro e o dourado do robô.
+2. **Alfa binário**: pixel meio-transparente vira halo no jogo.
+3. **Recorte** pela caixa unida entre os frames, para a animação não tremer.
+4. **Recorte do céu** nas camadas de parallax, por preenchimento a partir da
+   borda de cima com dois limites — um local (degradê anda de pouco em pouco,
+   telhado é um salto) e um global. Nuvem entra na regra por ser opaca e barrar
+   o preenchimento. Depois sobra só o que encosta na base.
+5. **Escala dos props**: o gerador desenha cada objeto preenchendo a própria
+   tela, então a moeda nasce do tamanho do poste. Cada um é encolhido por
+   divisor inteiro até uma altura-alvo derivada do herói (~32 px por metro).
+6. **Chão**: monta uma faixa de 16×28 combinando o tile de calçada com o de
    asfalto do tileset gerado, detectando sozinho onde a calçada começa.
-6. **atlas.json** com tamanhos, número de frames e âncoras (pés / centro).
+7. **Contraste contra o céu**: mede e **avisa**, sem corrigir. Escurecer à
+   força estragaria a identidade — um astronauta branco tem de ser branco.
+8. **atlas.json** com tamanhos, número de frames e âncoras (pés / centro).
 
-Ferramentas de inspeção usadas durante o ajuste:
+Coberto por `node tools/v2/test-demake.mjs`.
+
+### Inspeção
+
+Métrica não pega "esse ficou estranho". O `qa.mjs` confere o que o olho perde
+num zoom de 5× — contagem de frames, âncora que treme, alfa meio-transparente,
+contraste, altura fora do padrão do elenco — e gera folhas de contato em
+`assets/_qa/`, incluindo `_elenco.png` com o elenco inteiro lado a lado. É
+olhando essa folha que se decide o que refazer.
+
+Na v2, quatro skins foram reprovadas assim e refeitas: o fantasma (uma massa
+branca sem forma), o pirata e o neon (não liam como pirata nem como neon) e o
+robô de ouro (chapado demais para a skin mais cara do jogo).
 
 ```bash
-node tools/zoom.mjs assets/sprites/coin.png /tmp/coin.png 8
-```
-
-```bash
-node tools/_sheet.mjs
+node tools/v2/tela.mjs saida.png 4 < base64-de-um-png   # amplia sem suavizar
+node tools/v2/telas.mjs folha.png 3                     # folha das telas do jogo
 ```
 
 ---
@@ -327,8 +356,8 @@ guardado para o final.
 
 **Escala do mundo.** 24 pixels por metro real. A 3 m/s isso dá um scroll
 agradável (uma tela a cada ~2,2 s), mas comprime a distância: uma tela mostra
-só 6,7 m de mundo. Por isso a zona de chegada tem 12 m e a entrada do gato é
-encenada em coordenadas de tela — senão ele só apareceria nos últimos 5 metros.
+só 6,7 m de mundo. Por isso a zona de chegada tem 12 m: em metros de mundo ela
+caberia em menos de uma tela e passaria batido.
 
 **Percurso determinístico.** A mesma meta gera sempre o mesmo trajeto (PRNG
 semeado pela distância). Repetir uma meta é repetir o mesmo caminho, o que
@@ -397,8 +426,8 @@ Pré-renderizado como padrão de 2×2, virou uma única chamada — 0,20 ms.
 **Sem tempo limite nem derrota.** O objetivo é correr a distância e juntar
 moedas, então o cronômetro conta para cima e serve de registro. Isso também
 tirou a escolha de ritmo e de dificuldade do menu: eram formas de ajustar um
-limite que deixou de existir. O gato ficou como mascote — espera na chegada e
-comemora junto.
+limite que deixou de existir. O nome ficou do primeiro desenho do jogo, quando
+a corrida era para salvar um gato atropelado.
 
 **Rival some andando, não no ar.** A distância física do outro jogador é
 mapeada num deslocamento que ULTRAPASSA a borda da tela de propósito: quem se

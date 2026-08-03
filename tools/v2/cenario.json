@@ -1,0 +1,21 @@
+{
+  "props": {
+    "coin": "3a3cca5c-4d80-45ff-b890-1d109a39ca58",
+    "milk": "75468e0d-b135-434b-a60d-d0e4ee6eae71",
+    "trash_bin": "aa3f2c6b-3e69-4d9f-877e-5c66e8df09f0",
+    "cone": "d46bad07-cbf7-4692-a779-b55c870e3a8e",
+    "box": "d5aa4f84-b048-42b8-aa71-41ccbe485ce7",
+    "hydrant": "e02ad19d-9c0f-41e0-9fde-06a952396fa0",
+    "sign": "c81224fe-8583-43f0-af43-cbfde1c252af",
+    "streetlight": "0f205acc-a949-4345-8a25-8fb97751d167",
+    "bush": "72faab94-9863-43b2-9066-2652b7a92980"
+  },
+  "cenas": {
+    "bg_sky": "9beb7ef9-9952-4c90-89f9-fc26b6102581",
+    "bg_city": "04b2d905-d959-468f-ba5a-57961462eb2c",
+    "title_art": "b5707ad1-82ed-487e-bb9a-ac887cbe9e1b"
+  },
+  "tileset": {
+    "road": "e3658b0b-c916-4244-9f77-423558cd69fc"
+  }
+}

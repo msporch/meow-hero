@@ -3,3 +3,8 @@ tools/.pixellab-token
 tools/.cache/
 assets/_raw/
 *.log
+assets/_gba/
+assets/_v2raw/
+assets/_qa/
+assets/_cmp/
+assets/_probe/

@@ -67,10 +67,12 @@ function buildRival() {
   const rg = rv.getContext('2d');
   rg.imageSmoothingEnabled = false;
   rg.drawImage(src.img, 0, 0);
+  // Silhueta na tinta escura da paleta: em cor o rival precisa ler como
+  // "outra pessoa ao longe", não como uma cópia do jogador.
   const rpx = rg.getImageData(0, 0, rv.width, rv.height);
   for (let i = 0; i < rpx.data.length; i += 4) {
     if (rpx.data[i + 3] < 128) continue;
-    rpx.data[i] = 0x0f; rpx.data[i + 1] = 0x38; rpx.data[i + 2] = 0x0f;
+    rpx.data[i] = 0x1e; rpx.data[i + 1] = 0x24; rpx.data[i + 2] = 0x36;
   }
   rg.putImageData(rpx, 0, 0);
   A.anims.rival_run = { img: rv, fw: src.fw, fh: src.fh, frames: src.frames,

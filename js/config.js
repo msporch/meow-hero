@@ -4,8 +4,37 @@
 export const W = 160;
 export const H = 144;
 
-/** Paleta DMG: 0 = mais escuro, 3 = mais claro. */
-export const PALETTE = ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'];
+/**
+ * Paleta da v2 (Game Boy Advance).
+ *
+ * Os índices 0..3 mantêm a ordem escuro→claro da v1 de propósito: todas as
+ * chamadas de desenho que já existiam continuam produzindo algo coerente sem
+ * precisar ser reescritas uma a uma. Os índices seguintes são acentos que a
+ * paleta de 4 tons não permitia — dourado para moeda, vermelho para alerta,
+ * azul de céu separado do branco de painel.
+ *
+ * A v1 (4 tons de verde) está em `git checkout v1-gameboy`.
+ */
+export const PALETTE = [
+  '#12141c',  // 0 TINTA   — texto escuro, molduras
+  '#3a4a6b',  // 1 MEIO    — texto secundário, sombra
+  '#8fb4d9',  // 2 CLARO   — prédios distantes, realce
+  '#f2f6fb',  // 3 PAPEL   — fundo de painel
+  '#f0c04a',  // 4 MOEDA   — dourado
+  '#d9584a',  // 5 ALERTA  — vermelho
+  '#5fbf7a',  // 6 OK      — verde
+  '#1e2436',  // 7 PAINEL  — fundo escuro de HUD
+  '#a8c4e0',  // 8 CEU     — azul de céu
+  '#6b7c99',  // 9 ASFALTO — cinza do chão
+];
+
+/** Nomes dos índices. Usar estes em código novo. */
+export const COR = {
+  TINTA: 0, MEIO: 1, CLARO: 2, PAPEL: 3,
+  MOEDA: 4, ALERTA: 5, OK: 6, PAINEL: 7, CEU: 8, ASFALTO: 9,
+};
+
+// Mantidos por compatibilidade com o código existente.
 export const DARK = 0, MID = 1, LIGHT = 2, PAPER = 3;
 
 /** Quantos pixels de mundo equivalem a 1 metro real. */

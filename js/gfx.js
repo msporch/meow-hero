@@ -1,4 +1,7 @@
-// Camada de desenho: canvas 160x144, paleta DMG, helpers de blit e primitivas.
+// Camada de desenho: canvas 160x144, paleta indexada (js/config.js), helpers de
+// blit e primitivas. Tudo aqui recebe ÍNDICE de cor, nunca hex — foi o que
+// permitiu trocar os 4 tons de verde da v1 pela paleta colorida sem reescrever
+// as telas uma a uma.
 import { W, H, PALETTE } from './config.js';
 import { initFont } from './font.js';
 
@@ -70,7 +73,7 @@ function ditherPattern(color, phase) {
   return pat;
 }
 
-/** Padrão xadrez 50% — usado para sombras e gradientes na paleta de 4 cores. */
+/** Padrão xadrez 50% — sombras e meios-tons sem gastar uma cor da paleta. */
 export function dither(x, y, w, h, color, phase = 0) {
   ctx.fillStyle = ditherPattern(color, phase);
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));

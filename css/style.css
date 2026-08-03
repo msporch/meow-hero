@@ -1,18 +1,27 @@
-/* ---------- Meow Hero — shell retrô ---------- */
+/* ---------- Meow Hero — shell retrô (v2, Game Boy Advance) ---------- */
+/*
+ * A v1 imitava o DMG: carcaça cinza-esverdeada e LCD verde-limão. A v2 é
+ * colorida, então a carcaça acompanha — índigo do AGB-001, e o fundo do LCD
+ * passa a ser o azul de céu da paleta do jogo (js/config.js), para que a
+ * moldura e a tela contem a mesma história.
+ */
 :root {
-  --dmg-0: #0f380f;   /* mais escuro */
-  --dmg-1: #306230;
-  --dmg-2: #8bac0f;
-  --dmg-3: #9bbc0f;   /* mais claro */
+  /* Ecoam js/config.js — mudou lá, muda aqui. */
+  --gba-tinta:  #12141c;
+  --gba-meio:   #3a4a6b;
+  --gba-claro:  #8fb4d9;
+  --gba-papel:  #f2f6fb;
+  --gba-ceu:    #a8c4e0;
+  --gba-moeda:  #f0c04a;
 
-  --shell:      #1b1d18;
-  --shell-hi:   #2b2f27;
-  --shell-lo:   #101210;
-  --bezel:      #0a0c09;
-  --btn:        #3b4034;
-  --btn-hi:     #4d5344;
-  --btn-press:  #262a21;
-  --ink:        #7d8a6b;
+  --shell:      #3a3468;
+  --shell-hi:   #4d4585;
+  --shell-lo:   #221f3f;
+  --bezel:      #16142a;
+  --btn:        #2b2850;
+  --btn-hi:     #6b5fa8;
+  --btn-press:  #1a1834;
+  --ink:        #b9b2e0;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -64,7 +73,7 @@ body {
   position: relative;
   width: 100%;
   aspect-ratio: 160 / 144;
-  background: var(--dmg-3);
+  background: var(--gba-ceu);
   overflow: hidden;
 }
 
@@ -81,7 +90,7 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: .16;
+  opacity: .10;
   background:
     repeating-linear-gradient(0deg, rgba(0,0,0,.55) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 1px, transparent 1px 3px);
@@ -94,10 +103,10 @@ body.no-scanlines #scanlines { display: none; }
   text-align: center;
   font-size: clamp(6px, 2vw, 9px);
   letter-spacing: .14em;
-  color: #55604a;
+  color: #8a80c4;
   text-transform: uppercase;
 }
-#lcd-label span { margin: 0 .5em; color: #7e3f6a; }
+#lcd-label span { margin: 0 .5em; color: var(--gba-moeda); }
 
 /* ---------- Controles ---------- */
 #controls {
@@ -205,7 +214,7 @@ body.no-scanlines #scanlines { display: none; }
   margin: 0;
   font-size: clamp(8px, 2.4vw, 10px);
   text-align: center;
-  color: #4d5644;
+  color: #857cbb;
   letter-spacing: .04em;
   flex: 0 0 auto;
 }
@@ -222,9 +231,9 @@ body.no-scanlines #scanlines { display: none; }
   gap: 10px;
   width: min(94vw, 440px);
   padding: 10px 12px;
-  background: var(--dmg-0);
-  color: var(--dmg-3);
-  border: 2px solid var(--dmg-1);
+  background: var(--gba-tinta);
+  color: var(--gba-papel);
+  border: 2px solid var(--btn-hi);
   border-radius: 8px;
   font-size: 12px;
   box-shadow: 0 6px 20px rgba(0,0,0,.5);
@@ -233,10 +242,10 @@ body.no-scanlines #scanlines { display: none; }
 #install-bar span { flex: 1; }
 #install-bar button {
   border: none; font: inherit; font-weight: 700; cursor: pointer;
-  background: var(--dmg-2); color: var(--dmg-0);
+  background: var(--gba-moeda); color: var(--gba-tinta);
   padding: 6px 12px; border-radius: 5px;
 }
-#install-no { background: transparent; color: var(--dmg-2); padding: 6px 8px; }
+#install-no { background: transparent; color: var(--gba-claro); padding: 6px 8px; }
 
 /* ---------- Paisagem / telas largas ---------- */
 @media (orientation: landscape) and (max-height: 560px) {

@@ -23,6 +23,18 @@ const LOTE = 3;              // personagens criados por vez
 const ESPERA_MS = 12000;     // intervalo entre verificações
 const MAX_RODADAS = 60;
 
+/**
+ * Teto de tentativas por personagem.
+ *
+ * Sem isto o laço recria indefinidamente quem falha: um personagem que o
+ * servidor recusa de forma consistente consumia uma geração por rodada, e 80
+ * rodadas × 3 personagens queimaram ~240 gerações sem produzir nada. Agora
+ * desiste, avisa, e segue com o resto.
+ */
+const MAX_TENTATIVAS = 3;
+const tentativas = new Map();
+const desistiu = new Set();
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const carregar = () => JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 const salvar = m => fs.writeFileSync(MANIFEST, JSON.stringify(m, null, 2));
@@ -70,7 +82,16 @@ for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
     const { st, anims } = await estado(m.characters[chave]);
 
     if (st === 'falhou') {
-      console.log(`✗ ${chave}: o servidor falhou, refazendo`);
+      const n = (tentativas.get(chave) ?? 0) + 1;
+      tentativas.set(chave, n);
+      if (n > MAX_TENTATIVAS) {
+        if (!desistiu.has(chave)) {
+          desistiu.add(chave);
+          console.log(`✗ ${chave}: falhou ${MAX_TENTATIVAS}x, desistindo (nao gasta mais geracoes)`);
+        }
+        continue;
+      }
+      console.log(`✗ ${chave}: falhou (${n}/${MAX_TENTATIVAS}), refazendo`);
       delete m.characters[chave];
       for (const a of Object.keys(m.charAnims)) if (a.startsWith(`${chave}_`)) delete m.charAnims[a];
       salvar(m);

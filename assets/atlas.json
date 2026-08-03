@@ -1,11 +1,21 @@
 {
-  "palette": [
-    "#0f380f",
-    "#306230",
-    "#8bac0f",
-    "#9bbc0f"
-  ],
+  "versao": "gba",
+  "paleta": "gba-16",
   "sprites": {
+    "box": {
+      "file": "sprites/box.png",
+      "w": 20,
+      "h": 19,
+      "anchorX": 10,
+      "anchorY": 19
+    },
+    "bush": {
+      "file": "sprites/bush.png",
+      "w": 12,
+      "h": 17,
+      "anchorX": 6,
+      "anchorY": 17
+    },
     "coin": {
       "file": "sprites/coin.png",
       "w": 15,
@@ -13,73 +23,59 @@
       "anchorX": 8,
       "anchorY": 15
     },
+    "cone": {
+      "file": "sprites/cone.png",
+      "w": 12,
+      "h": 14,
+      "anchorX": 6,
+      "anchorY": 14
+    },
+    "hydrant": {
+      "file": "sprites/hydrant.png",
+      "w": 10,
+      "h": 19,
+      "anchorX": 5,
+      "anchorY": 19
+    },
     "milk": {
       "file": "sprites/milk.png",
-      "w": 10,
+      "w": 9,
       "h": 14,
       "anchorX": 5,
       "anchorY": 14
     },
-    "trash_bin": {
-      "file": "sprites/trash_bin.png",
-      "w": 11,
-      "h": 17,
-      "anchorX": 6,
-      "anchorY": 17
-    },
-    "cone": {
-      "file": "sprites/cone.png",
-      "w": 12,
-      "h": 15,
-      "anchorX": 6,
-      "anchorY": 15
-    },
-    "box": {
-      "file": "sprites/box.png",
-      "w": 12,
-      "h": 15,
-      "anchorX": 6,
-      "anchorY": 15
-    },
-    "hydrant": {
-      "file": "sprites/hydrant.png",
-      "w": 11,
-      "h": 17,
-      "anchorX": 6,
-      "anchorY": 17
-    },
     "sign": {
       "file": "sprites/sign.png",
-      "w": 8,
-      "h": 19,
-      "anchorX": 4,
-      "anchorY": 19
+      "w": 16,
+      "h": 25,
+      "anchorX": 8,
+      "anchorY": 25
     },
     "streetlight": {
       "file": "sprites/streetlight.png",
-      "w": 5,
-      "h": 35,
-      "anchorX": 3,
-      "anchorY": 35
-    },
-    "bush": {
-      "file": "sprites/bush.png",
-      "w": 7,
-      "h": 14,
+      "w": 8,
+      "h": 45,
       "anchorX": 4,
-      "anchorY": 14
+      "anchorY": 45
     },
-    "bg_sky": {
-      "file": "sprites/bg_sky.png",
-      "w": 160,
-      "h": 51,
-      "anchorX": 0,
-      "anchorY": 0
+    "trash_bin": {
+      "file": "sprites/trash_bin.png",
+      "w": 16,
+      "h": 25,
+      "anchorX": 8,
+      "anchorY": 25
     },
     "bg_city": {
       "file": "sprites/bg_city.png",
       "w": 160,
-      "h": 78,
+      "h": 60,
+      "anchorX": 0,
+      "anchorY": 0
+    },
+    "bg_sky": {
+      "file": "sprites/bg_sky.png",
+      "w": 160,
+      "h": 37,
       "anchorX": 0,
       "anchorY": 0
     },
@@ -110,515 +106,539 @@
   "anims": {
     "alien_idle": {
       "file": "sprites/alien_idle.png",
-      "fw": 11,
-      "fh": 45,
+      "fw": 19,
+      "fh": 62,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 45
+      "anchorX": 10,
+      "anchorY": 62
     },
     "alien_pose": {
       "file": "sprites/alien_pose.png",
-      "fw": 11,
-      "fh": 45,
+      "fw": 19,
+      "fh": 61,
       "frames": 1,
-      "anchorX": 6,
-      "anchorY": 45
+      "anchorX": 10,
+      "anchorY": 61
     },
     "alien_run": {
       "file": "sprites/alien_run.png",
-      "fw": 31,
-      "fh": 43,
+      "fw": 42,
+      "fh": 62,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 43
+      "anchorX": 21,
+      "anchorY": 62
     },
     "astro_idle": {
       "file": "sprites/astro_idle.png",
-      "fw": 14,
-      "fh": 42,
+      "fw": 21,
+      "fh": 59,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 11,
+      "anchorY": 59
     },
     "astro_pose": {
       "file": "sprites/astro_pose.png",
-      "fw": 13,
-      "fh": 42,
+      "fw": 20,
+      "fh": 59,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 10,
+      "anchorY": 59
     },
     "astro_run": {
       "file": "sprites/astro_run.png",
-      "fw": 31,
-      "fh": 40,
+      "fw": 47,
+      "fh": 57,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 40
+      "anchorX": 24,
+      "anchorY": 57
     },
     "banana_idle": {
       "file": "sprites/banana_idle.png",
-      "fw": 11,
-      "fh": 44,
+      "fw": 20,
+      "fh": 64,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 44
+      "anchorX": 10,
+      "anchorY": 64
     },
     "banana_pose": {
       "file": "sprites/banana_pose.png",
-      "fw": 11,
-      "fh": 44,
+      "fw": 27,
+      "fh": 65,
       "frames": 1,
-      "anchorX": 6,
-      "anchorY": 44
+      "anchorX": 14,
+      "anchorY": 65
     },
     "banana_run": {
       "file": "sprites/banana_run.png",
-      "fw": 31,
-      "fh": 43,
+      "fw": 44,
+      "fh": 62,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 43
+      "anchorX": 22,
+      "anchorY": 62
     },
     "bombeiro_idle": {
       "file": "sprites/bombeiro_idle.png",
-      "fw": 14,
-      "fh": 43,
+      "fw": 18,
+      "fh": 59,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 43
+      "anchorX": 9,
+      "anchorY": 59
     },
     "bombeiro_pose": {
       "file": "sprites/bombeiro_pose.png",
-      "fw": 13,
-      "fh": 42,
+      "fw": 17,
+      "fh": 58,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 9,
+      "anchorY": 58
     },
     "bombeiro_run": {
       "file": "sprites/bombeiro_run.png",
-      "fw": 32,
-      "fh": 41,
+      "fw": 45,
+      "fh": 56,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 41
+      "anchorX": 23,
+      "anchorY": 56
     },
     "cachorro_idle": {
       "file": "sprites/cachorro_idle.png",
-      "fw": 29,
-      "fh": 23,
+      "fw": 44,
+      "fh": 36,
       "frames": 8,
-      "anchorX": 15,
-      "anchorY": 23
+      "anchorX": 22,
+      "anchorY": 36
     },
     "cachorro_pose": {
       "file": "sprites/cachorro_pose.png",
-      "fw": 29,
-      "fh": 22,
+      "fw": 44,
+      "fh": 36,
       "frames": 1,
-      "anchorX": 15,
-      "anchorY": 22
+      "anchorX": 22,
+      "anchorY": 36
     },
     "cachorro_run": {
       "file": "sprites/cachorro_run.png",
-      "fw": 37,
-      "fh": 21,
+      "fw": 56,
+      "fh": 32,
       "frames": 8,
-      "anchorX": 19,
-      "anchorY": 21
+      "anchorX": 28,
+      "anchorY": 32
     },
     "cavaleiro_idle": {
       "file": "sprites/cavaleiro_idle.png",
-      "fw": 13,
-      "fh": 44,
+      "fw": 20,
+      "fh": 62,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 44
+      "anchorX": 10,
+      "anchorY": 62
     },
     "cavaleiro_pose": {
       "file": "sprites/cavaleiro_pose.png",
-      "fw": 13,
-      "fh": 44,
+      "fw": 19,
+      "fh": 62,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 44
+      "anchorX": 10,
+      "anchorY": 62
     },
     "cavaleiro_run": {
       "file": "sprites/cavaleiro_run.png",
-      "fw": 31,
-      "fh": 42,
+      "fw": 43,
+      "fh": 59,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 42
+      "anchorX": 22,
+      "anchorY": 59
     },
     "chef_idle": {
       "file": "sprites/chef_idle.png",
-      "fw": 16,
-      "fh": 46,
+      "fw": 14,
+      "fh": 64,
       "frames": 4,
-      "anchorX": 8,
-      "anchorY": 46
+      "anchorX": 7,
+      "anchorY": 64
     },
     "chef_pose": {
       "file": "sprites/chef_pose.png",
-      "fw": 15,
-      "fh": 46,
+      "fw": 14,
+      "fh": 65,
       "frames": 1,
-      "anchorX": 8,
-      "anchorY": 46
+      "anchorX": 7,
+      "anchorY": 65
     },
     "chef_run": {
       "file": "sprites/chef_run.png",
-      "fw": 36,
-      "fh": 44,
+      "fw": 45,
+      "fh": 63,
       "frames": 8,
-      "anchorX": 18,
-      "anchorY": 44
+      "anchorX": 23,
+      "anchorY": 63
     },
     "dino_idle": {
       "file": "sprites/dino_idle.png",
-      "fw": 25,
-      "fh": 40,
+      "fw": 32,
+      "fh": 57,
       "frames": 4,
-      "anchorX": 13,
-      "anchorY": 40
+      "anchorX": 16,
+      "anchorY": 57
     },
     "dino_pose": {
       "file": "sprites/dino_pose.png",
-      "fw": 22,
-      "fh": 40,
+      "fw": 32,
+      "fh": 57,
       "frames": 1,
-      "anchorX": 11,
-      "anchorY": 40
+      "anchorX": 16,
+      "anchorY": 57
     },
     "dino_run": {
       "file": "sprites/dino_run.png",
-      "fw": 31,
-      "fh": 40,
+      "fw": 44,
+      "fh": 55,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 40
+      "anchorX": 22,
+      "anchorY": 55
     },
     "esqueleto_idle": {
       "file": "sprites/esqueleto_idle.png",
-      "fw": 10,
-      "fh": 41,
+      "fw": 12,
+      "fh": 54,
       "frames": 4,
-      "anchorX": 5,
-      "anchorY": 41
+      "anchorX": 6,
+      "anchorY": 54
     },
     "esqueleto_pose": {
       "file": "sprites/esqueleto_pose.png",
-      "fw": 9,
-      "fh": 41,
+      "fw": 11,
+      "fh": 54,
       "frames": 1,
-      "anchorX": 5,
-      "anchorY": 41
+      "anchorX": 6,
+      "anchorY": 54
     },
     "esqueleto_run": {
       "file": "sprites/esqueleto_run.png",
-      "fw": 31,
-      "fh": 39,
+      "fw": 43,
+      "fh": 52,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 39
+      "anchorX": 22,
+      "anchorY": 52
     },
     "fantasma_idle": {
       "file": "sprites/fantasma_idle.png",
-      "fw": 12,
-      "fh": 41,
+      "fw": 35,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 41
+      "anchorX": 18,
+      "anchorY": 58
     },
     "fantasma_pose": {
       "file": "sprites/fantasma_pose.png",
-      "fw": 12,
-      "fh": 41,
+      "fw": 34,
+      "fh": 57,
       "frames": 1,
-      "anchorX": 6,
-      "anchorY": 41
+      "anchorX": 17,
+      "anchorY": 57
+    },
+    "fantasma_reprovado_pose": {
+      "file": "sprites/fantasma_reprovado_pose.png",
+      "fw": 20,
+      "fh": 57,
+      "frames": 1,
+      "anchorX": 10,
+      "anchorY": 57
     },
     "fantasma_run": {
       "file": "sprites/fantasma_run.png",
-      "fw": 31,
-      "fh": 39,
+      "fw": 45,
+      "fh": 56,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 39
+      "anchorX": 23,
+      "anchorY": 56
     },
     "gato_idle": {
       "file": "sprites/gato_idle.png",
-      "fw": 32,
-      "fh": 22,
+      "fw": 45,
+      "fh": 36,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 22
+      "anchorX": 23,
+      "anchorY": 36
     },
     "gato_pose": {
       "file": "sprites/gato_pose.png",
-      "fw": 30,
-      "fh": 21,
+      "fw": 44,
+      "fh": 34,
       "frames": 1,
-      "anchorX": 15,
-      "anchorY": 21
+      "anchorX": 22,
+      "anchorY": 34
     },
     "gato_run": {
       "file": "sprites/gato_run.png",
-      "fw": 37,
-      "fh": 22,
+      "fw": 54,
+      "fh": 41,
       "frames": 8,
-      "anchorX": 19,
-      "anchorY": 22
+      "anchorX": 27,
+      "anchorY": 41
     },
     "hero_idle": {
       "file": "sprites/hero_idle.png",
-      "fw": 15,
-      "fh": 43,
+      "fw": 12,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 8,
-      "anchorY": 43
-    },
-    "hero_jump": {
-      "file": "sprites/hero_jump.png",
-      "fw": 20,
-      "fh": 46,
-      "frames": 7,
-      "anchorX": 10,
-      "anchorY": 46
+      "anchorX": 6,
+      "anchorY": 58
     },
     "hero_pose": {
       "file": "sprites/hero_pose.png",
-      "fw": 14,
-      "fh": 43,
+      "fw": 12,
+      "fh": 57,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 43
+      "anchorX": 6,
+      "anchorY": 57
     },
     "hero_run": {
       "file": "sprites/hero_run.png",
-      "fw": 33,
-      "fh": 42,
+      "fw": 45,
+      "fh": 56,
       "frames": 8,
-      "anchorX": 17,
-      "anchorY": 42
+      "anchorX": 23,
+      "anchorY": 56
     },
     "mago_idle": {
       "file": "sprites/mago_idle.png",
-      "fw": 18,
-      "fh": 44,
+      "fw": 21,
+      "fh": 64,
       "frames": 4,
-      "anchorX": 9,
-      "anchorY": 44
+      "anchorX": 11,
+      "anchorY": 64
     },
     "mago_pose": {
       "file": "sprites/mago_pose.png",
-      "fw": 17,
-      "fh": 44,
+      "fw": 21,
+      "fh": 63,
       "frames": 1,
-      "anchorX": 9,
-      "anchorY": 44
+      "anchorX": 11,
+      "anchorY": 63
     },
     "mago_run": {
       "file": "sprites/mago_run.png",
-      "fw": 33,
-      "fh": 43,
+      "fw": 43,
+      "fh": 63,
       "frames": 8,
-      "anchorX": 17,
-      "anchorY": 43
+      "anchorX": 22,
+      "anchorY": 63
     },
     "neon_idle": {
       "file": "sprites/neon_idle.png",
-      "fw": 11,
-      "fh": 42,
+      "fw": 16,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 42
+      "anchorX": 8,
+      "anchorY": 58
     },
     "neon_pose": {
       "file": "sprites/neon_pose.png",
-      "fw": 11,
-      "fh": 41,
+      "fw": 16,
+      "fh": 58,
       "frames": 1,
-      "anchorX": 6,
-      "anchorY": 41
+      "anchorX": 8,
+      "anchorY": 58
+    },
+    "neon_reprovado_pose": {
+      "file": "sprites/neon_reprovado_pose.png",
+      "fw": 16,
+      "fh": 57,
+      "frames": 1,
+      "anchorX": 8,
+      "anchorY": 57
     },
     "neon_run": {
       "file": "sprites/neon_run.png",
-      "fw": 31,
-      "fh": 40,
+      "fw": 43,
+      "fh": 55,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 40
+      "anchorX": 22,
+      "anchorY": 55
     },
     "ninja_idle": {
       "file": "sprites/ninja_idle.png",
-      "fw": 14,
-      "fh": 42,
+      "fw": 26,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 13,
+      "anchorY": 58
     },
     "ninja_pose": {
       "file": "sprites/ninja_pose.png",
-      "fw": 14,
-      "fh": 42,
+      "fw": 23,
+      "fh": 57,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 12,
+      "anchorY": 57
     },
     "ninja_run": {
       "file": "sprites/ninja_run.png",
-      "fw": 32,
-      "fh": 39,
+      "fw": 45,
+      "fh": 56,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 39
+      "anchorX": 23,
+      "anchorY": 56
     },
     "panda_idle": {
       "file": "sprites/panda_idle.png",
       "fw": 14,
-      "fh": 43,
+      "fh": 61,
       "frames": 4,
       "anchorX": 7,
-      "anchorY": 43
+      "anchorY": 61
     },
     "panda_pose": {
       "file": "sprites/panda_pose.png",
       "fw": 14,
-      "fh": 42,
+      "fh": 60,
       "frames": 1,
       "anchorX": 7,
-      "anchorY": 42
+      "anchorY": 60
     },
     "panda_run": {
       "file": "sprites/panda_run.png",
-      "fw": 31,
-      "fh": 41,
+      "fw": 43,
+      "fh": 57,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 41
+      "anchorX": 22,
+      "anchorY": 57
     },
     "pirata_idle": {
       "file": "sprites/pirata_idle.png",
-      "fw": 13,
-      "fh": 44,
+      "fw": 30,
+      "fh": 65,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 44
+      "anchorX": 15,
+      "anchorY": 65
     },
     "pirata_pose": {
       "file": "sprites/pirata_pose.png",
-      "fw": 12,
-      "fh": 44,
+      "fw": 29,
+      "fh": 65,
       "frames": 1,
-      "anchorX": 6,
-      "anchorY": 44
+      "anchorX": 15,
+      "anchorY": 65
+    },
+    "pirata_reprovado_pose": {
+      "file": "sprites/pirata_reprovado_pose.png",
+      "fw": 20,
+      "fh": 60,
+      "frames": 1,
+      "anchorX": 10,
+      "anchorY": 60
     },
     "pirata_run": {
       "file": "sprites/pirata_run.png",
-      "fw": 31,
-      "fh": 43,
+      "fw": 44,
+      "fh": 61,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 43
+      "anchorX": 22,
+      "anchorY": 61
     },
     "robo_idle": {
       "file": "sprites/robo_idle.png",
-      "fw": 12,
-      "fh": 44,
+      "fw": 11,
+      "fh": 61,
       "frames": 4,
       "anchorX": 6,
-      "anchorY": 44
+      "anchorY": 61
     },
     "robo_ouro_idle": {
       "file": "sprites/robo_ouro_idle.png",
-      "fw": 11,
-      "fh": 42,
+      "fw": 15,
+      "fh": 60,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 42
+      "anchorX": 8,
+      "anchorY": 60
     },
     "robo_ouro_pose": {
       "file": "sprites/robo_ouro_pose.png",
-      "fw": 10,
-      "fh": 42,
+      "fw": 14,
+      "fh": 59,
       "frames": 1,
-      "anchorX": 5,
-      "anchorY": 42
+      "anchorX": 7,
+      "anchorY": 59
+    },
+    "robo_ouro_reprovado_pose": {
+      "file": "sprites/robo_ouro_reprovado_pose.png",
+      "fw": 11,
+      "fh": 59,
+      "frames": 1,
+      "anchorX": 6,
+      "anchorY": 59
     },
     "robo_ouro_run": {
       "file": "sprites/robo_ouro_run.png",
-      "fw": 32,
-      "fh": 39,
+      "fw": 44,
+      "fh": 57,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 39
+      "anchorX": 22,
+      "anchorY": 57
     },
     "robo_pose": {
       "file": "sprites/robo_pose.png",
       "fw": 11,
-      "fh": 44,
+      "fh": 60,
       "frames": 1,
       "anchorX": 6,
-      "anchorY": 44
+      "anchorY": 60
     },
     "robo_run": {
       "file": "sprites/robo_run.png",
-      "fw": 31,
-      "fh": 43,
+      "fw": 44,
+      "fh": 60,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 43
+      "anchorX": 22,
+      "anchorY": 60
     },
     "vampiro_idle": {
       "file": "sprites/vampiro_idle.png",
-      "fw": 13,
-      "fh": 42,
+      "fw": 16,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 8,
+      "anchorY": 58
     },
     "vampiro_pose": {
       "file": "sprites/vampiro_pose.png",
-      "fw": 13,
-      "fh": 42,
+      "fw": 22,
+      "fh": 57,
       "frames": 1,
-      "anchorX": 7,
-      "anchorY": 42
+      "anchorX": 11,
+      "anchorY": 57
     },
     "vampiro_run": {
       "file": "sprites/vampiro_run.png",
-      "fw": 34,
-      "fh": 42,
+      "fw": 44,
+      "fh": 56,
       "frames": 8,
-      "anchorX": 17,
-      "anchorY": 42
+      "anchorX": 22,
+      "anchorY": 56
     },
     "zumbi_idle": {
       "file": "sprites/zumbi_idle.png",
-      "fw": 11,
-      "fh": 43,
+      "fw": 13,
+      "fh": 58,
       "frames": 4,
-      "anchorX": 6,
-      "anchorY": 43
+      "anchorX": 7,
+      "anchorY": 58
     },
     "zumbi_pose": {
       "file": "sprites/zumbi_pose.png",
-      "fw": 11,
-      "fh": 43,
+      "fw": 12,
+      "fh": 57,
       "frames": 1,
       "anchorX": 6,
-      "anchorY": 43
+      "anchorY": 57
     },
     "zumbi_run": {
       "file": "sprites/zumbi_run.png",
-      "fw": 31,
-      "fh": 40,
+      "fw": 44,
+      "fh": 55,
       "frames": 8,
-      "anchorX": 16,
-      "anchorY": 40
+      "anchorX": 22,
+      "anchorY": 55
     }
   }
 }

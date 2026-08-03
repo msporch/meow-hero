@@ -8,7 +8,7 @@
 // limite nem derrota: o cronômetro conta para cima e serve de registro.
 import {
   W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOAL_MIN, GOAL_MAX, stepGoal,
-  CHUNK_PX, MILK_COINS, CUE_HALFWAY, POCKET_DELAYS, STRIDE_MIN, STRIDE_MAX, STRIDE_STEP,
+  CHUNK_PX, MILK_COINS, CUE_HALFWAY, POCKET_DELAYS, STRIDE_MIN, STRIDE_MAX, STRIDE_STEP, COR,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
   MP_MAX_ON_SCREEN,
 } from './config.js';
@@ -33,12 +33,17 @@ const S = {
 };
 
 /** Grade de caracteres da tela de nome, no espírito dos jogos da época. */
+// 26 letras + 10 dígitos + espaço + apagar + confirmar dão 39 células numa
+// grade de 40: a última é vazia (\x00) de propósito. Ela não é desenhada e a
+// navegação passa por cima dela — sem isso o cursor parava num buraco e o A
+// acrescentava "undefined" ao nome.
 const GRADE_NOME = [
   'ABCDEFGHIJ',
   'KLMNOPQRST',
   'UVWXYZ0123',
-  '456789 \x01\x02',   // \x01 = apagar, \x02 = confirmar
+  '456789 \x01\x02\x00',   // \x01 = apagar, \x02 = confirmar, \x00 = vazia
 ];
+const VAZIA = '\x00';
 const NOME_MAX = 8;
 
 export class Game {
@@ -178,7 +183,7 @@ export class Game {
     // Modo bolso: tela praticamente apagada. Economiza bateria em OLED e
     // evita que o bolso dispare toques.
     if (this.pocket && (this.state === S.RUN || this.state === S.ARM)) {
-      clear(0);
+      clear(COR.TINTA);
       // Números em tom escuro: dá pra conferir de relance sem acordar a tela,
       // e continua economizando bateria em telas OLED.
       drawText(ctx, `${(this.tracker.distanceM / 1000).toFixed(2)} KM`, W / 2, 56, 1, 'center');
@@ -252,16 +257,29 @@ export class Game {
   _inputNome(key) {
     const linhas = GRADE_NOME;
     const nl = linhas.length, nc = linhas[0].length;
+    const vazia = (r, c) => !linhas[r][c] || linhas[r][c] === VAZIA;
+
+    /** Anda na direção pedida e continua andando enquanto cair em célula vazia. */
+    const mover = (r, c, dr, dc) => {
+      for (let i = 0; i < nl * nc; i++) {
+        r = (r + dr + nl) % nl;
+        c = (c + dc + nc) % nc;
+        if (!vazia(r, c)) break;
+      }
+      return [r, c];
+    };
+
     let [r, c] = [Math.floor(this.nomeSel / nc), this.nomeSel % nc];
 
-    if (key === 'up') { r = (r + nl - 1) % nl; sfx.select(); }
-    else if (key === 'down') { r = (r + 1) % nl; sfx.select(); }
-    else if (key === 'left') { c = (c + nc - 1) % nc; sfx.select(); }
-    else if (key === 'right') { c = (c + 1) % nc; sfx.select(); }
+    if (key === 'up') { [r, c] = mover(r, c, -1, 0); sfx.select(); }
+    else if (key === 'down') { [r, c] = mover(r, c, 1, 0); sfx.select(); }
+    else if (key === 'left') { [r, c] = mover(r, c, 0, -1); sfx.select(); }
+    else if (key === 'right') { [r, c] = mover(r, c, 0, 1); sfx.select(); }
     else if (key === 'b') { this._nomeApaga(); return; }
     else if (key === 'start') { this._nomeConfirma(); return; }
     else if (key === 'a' || key === 'tap') {
       const ch = linhas[r][c];
+      if (!ch || ch === VAZIA) { sfx.back(); return; }
       if (ch === '\x01') this._nomeApaga();
       else if (ch === '\x02') this._nomeConfirma();
       else if (this.nome.length < NOME_MAX) { this.nome += ch; sfx.select(); }
@@ -289,8 +307,8 @@ export class Game {
   }
 
   _drawNome() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'SEU NOME', W / 2, 4, 3, 'center');
 
     // Campo com o nome digitado e cursor piscando.
@@ -303,17 +321,17 @@ export class Game {
 
     GRADE_NOME.forEach((linha, r) => {
       for (let c = 0; c < nc; c++) {
+        const raw = linha[c];
+        if (!raw || raw === VAZIA) continue;
         const idx = r * nc + c;
         const x = x0 + c * cw, y = y0 + r * ch;
-        const on = idx === this.nomeSel;
-        if (on) rect(x - 1, y - 2, cw - 1, ch - 1, 2);
-        const raw = linha[c];
+        if (idx === this.nomeSel) rect(x - 1, y - 2, cw - 1, ch - 1, COR.CLARO);
         const rot = raw === '\x01' ? '<' : raw === '\x02' ? 'OK' : raw === ' ' ? '_' : raw;
         drawText(ctx, rot, x + 4, y, 0);
       }
     });
 
-    rect(0, H - 22, W, 22, 0);
+    rect(0, H - 22, W, 22, COR.PAINEL);
     drawText(ctx, 'A ESCOLHE   B APAGA', W / 2, H - 18, 3, 'center');
     drawText(ctx, 'START CONFIRMA', W / 2, H - 9, 2, 'center');
   }
@@ -432,13 +450,13 @@ export class Game {
   }
 
   _drawPerfil() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'PERFIL', W / 2, 4, 3, 'center');
 
     const d = store.load();
     // Números primeiro: é o que a pessoa vem ver.
-    rect(0, 14, W, 19, 1);
+    rect(0, 14, W, 19, COR.MEIO);
     drawText(ctx, `\x05${d.coins}`, 4, 17, 3);
     drawText(ctx, `${d.totalKm.toFixed(1)}KM`, W - 4, 17, 3, 'right');
     drawText(ctx, `\x02${d.completadas} CORRIDAS`, 4, 25, 3);
@@ -453,7 +471,7 @@ export class Game {
       const it = itens[idx];
       const y = 38 + i * 12;
       const on = idx === this.perfilSel;
-      if (on) { rect(3, y - 3, W - 6, 12, 2); rectOutline(3, y - 3, W - 6, 12, 0); }
+      if (on) { rect(3, y - 3, W - 6, 12, COR.CLARO); rectOutline(3, y - 3, W - 6, 12, 0); }
       drawText(ctx, it.label, 8, y, 0);
       if (it.value != null) drawText(ctx, it.value, W - 14, y, 0, 'right');
       else if (on) drawText(ctx, '\x03', W - 12, y, 0);
@@ -465,7 +483,7 @@ export class Game {
     if (ini > 0) drawText(ctx, '\x02', W - 6, 38, 1);
     if (ini + VIS < n) drawText(ctx, '\x02', W - 6, 38 + (VIS - 1) * 12, 1);
 
-    rect(0, 112, W, 32, 0);
+    rect(0, 112, W, 32, COR.PAINEL);
     wrapText(itens[this.perfilSel]?.hint || '', W - 10).slice(0, 2)
       .forEach((l, i) => drawText(ctx, l, W / 2, 115 + i * LINE_H, 2, 'center'));
     drawText(ctx, 'B VOLTA', W / 2, 134, 3, 'center');
@@ -489,18 +507,24 @@ export class Game {
   }
 
   _drawTitle() {
-    clear(3);
+    clear(COR.PAPEL);
     // title_art é ancorado em (0,0), então cobre a tela inteira.
     if (!drawSprite('title_art', 0, 0)) rect(0, 0, W, H, 2);
 
     // Faixa escura atrás do logotipo para o texto respirar.
-    dither(0, 8, W, 34, 0, 0);
-    rect(0, 14, W, 22, 0);
-    drawText(ctx, 'MEOW HERO', W / 2, 18, 3, 'center');
+    //
+    // Na v1 as bordas dessa faixa eram um xadrez de 50%, que com 4 tons lia
+    // como meio-tom. Em cima de uma ilustração colorida ele vira sujeira: uma
+    // grade de pixels pretos por cima do desenho. Aqui a transição é uma linha
+    // sólida de cada lado, que emoldura em vez de manchar.
+    rect(0, 12, W, 26, COR.TINTA);
+    rect(0, 11, W, 1, COR.MOEDA);
+    rect(0, 38, W, 1, COR.MOEDA);
+    drawText(ctx, 'MEOW HERO', W / 2, 16, 3, 'center');
     drawText(ctx, 'CORRA. PEGUE AS MOEDAS.', W / 2, 27, 2, 'center');
 
     const d = store.load();
-    rect(0, H - 26, W, 26, 0);
+    rect(0, H - 26, W, 26, COR.PAINEL);
     if (Math.floor(this.t * 1.6) % 2 === 0) {
       drawText(ctx, 'START PARA COMECAR', W / 2, H - 22, 3, 'center');
     }
@@ -530,8 +554,8 @@ export class Game {
   }
 
   _drawMenu(titulo, itens, { dica, rodape } = {}) {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, titulo, W / 2, 4, 3, 'center');
 
     const alto = itens.length <= 3 ? 20 : 14;
@@ -551,7 +575,7 @@ export class Game {
       }
     });
 
-    rect(0, 96, W, 30, 0);
+    rect(0, 96, W, 30, COR.PAINEL);
     wrapText(dica || '', W - 12).slice(0, 3).forEach((l, i) =>
       drawText(ctx, l, W / 2, 99 + i * LINE_H, 2, 'center'));
 
@@ -596,8 +620,8 @@ export class Game {
   }
 
   _drawLoja() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'LOJA', W / 2, 4, 3, 'center');
 
     const saldo = store.get('coins') || 0;
@@ -615,7 +639,7 @@ export class Game {
       const tem = skins.isOwned(s.id);
       const usando = skins.equipped().id === s.id;
 
-      if (on) { rect(3, y - 3, W - 6, 12, 2); rectOutline(3, y - 3, W - 6, 12, 0); }
+      if (on) { rect(3, y - 3, W - 6, 12, COR.CLARO); rectOutline(3, y - 3, W - 6, 12, 0); }
       drawText(ctx, s.nome, 7, y, 0);
       drawText(ctx, usando ? 'EM USO' : tem ? 'SUA' : skins.formatPrice(s), W - 12, y, tem ? 1 : 0, 'right');
     }
@@ -624,10 +648,18 @@ export class Game {
     if (ini + VIS < n) drawText(ctx, '\x02', W - 4, 19 + (VIS - 1) * 12, 1);
 
     // Prévia da skin selecionada, correndo.
+    //
+    // O fundo da prévia é o azul do céu, não o branco do painel: é contra o céu
+    // que a skin vai aparecer no jogo, e sem isso o astronauta e o esqueleto —
+    // ambos brancos — somem justo na tela onde a pessoa decide se compra.
+    // A âncora fica no rodapé porque o sprite tem ~56px e, mais alto, a cabeça
+    // invadia a última linha da lista.
+    const PREV_TOPO = 64, PREV_BASE = 122;
+    rect(4, PREV_TOPO, 52, PREV_BASE - PREV_TOPO, COR.CEU);
     const sel = SKINS[this.lojaSel];
     const temSprite = !!A.anims[`${sel.anim}_run`];
-    if (temSprite) drawAnim(`${sel.anim}_run`, Math.floor(this.t * 10), 34, 104);
-    else drawText(ctx, '?', 34, 90, 1, 'center');
+    if (temSprite) drawAnim(`${sel.anim}_run`, Math.floor(this.t * 10), 30, PREV_BASE);
+    else drawText(ctx, '?', 30, 90, 1, 'center');
 
     const info = !temSprite
       ? 'Skin ainda nao disponivel nesta versao.'
@@ -639,7 +671,7 @@ export class Game {
           : `${sel.desc} Venda ainda nao configurada.`);
     wrapText(info, 96).slice(0, 4).forEach((l, i) => drawText(ctx, l, 60, 72 + i * LINE_H, 0));
 
-    rect(0, H - 12, W, 12, 0);
+    rect(0, H - 12, W, 12, COR.PAINEL);
     drawText(ctx, skins.isOwned(sel.id) ? 'A EQUIPA   B VOLTA' : 'A COMPRA   B VOLTA',
       W / 2, H - 9, 3, 'center');
   }
@@ -706,8 +738,8 @@ export class Game {
    * ficam pressionados.
    */
   _drawMeta() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'ESCOLHA A META', W / 2, 4, 3, 'center');
 
     // Número grande, o que importa aqui.
@@ -794,8 +826,8 @@ export class Game {
    * palavras claras antes de qualquer envio, e o padrão é não enviar.
    */
   _drawConsent() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'JOGAR ONLINE', W / 2, 4, 3, 'center');
 
     // wrapText garante que caiba: linhas fixas estouravam os 160px de largura.
@@ -810,7 +842,7 @@ export class Game {
     drawText(ctx, 'SERVIDOR', W / 2, 92, 1, 'center');
     drawText(ctx, srv.slice(0, 26), W / 2, 101, 0, 'center');
 
-    rect(0, H - 24, W, 24, 0);
+    rect(0, H - 24, W, 24, COR.PAINEL);
     drawText(ctx, 'A  ACEITO', W / 2, H - 20, 3, 'center');
     drawText(ctx, 'B  NAO, OBRIGADO', W / 2, H - 10, 2, 'center');
   }
@@ -884,8 +916,8 @@ export class Game {
   }
 
   _drawArm() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'PREPARANDO', W / 2, 4, 3, 'center');
 
     const st = this.tracker.status;
@@ -1051,14 +1083,14 @@ export class Game {
   // ---------------- desenho da corrida ----------------
 
   _drawWorld(worldX, { heroAnim = 'hero_run', heroFrame = 0, heroY = GROUND_Y } = {}) {
-    clear(3);
+    clear(COR.CEU);
 
-    // Céu
-    rect(0, HUD_H, W, GROUND_Y - HUD_H, 3);
+    // Céu — cor própria, separada do branco de painel.
+    rect(0, HUD_H, W, GROUND_Y - HUD_H, COR.CEU);
 
-    // Parallax em duas camadas. A distante fica bem mais alta para a silhueta
-    // aparecer ACIMA da próxima — se as duas ficam na mesma faixa, viram
-    // uma mancha só, já que ambas usam o mesmo tom.
+    // Parallax em duas camadas, cada uma com o céu recortado no demake para
+    // que o azul acima apareça por trás. A distante fica mais alta e rola mais
+    // devagar; é a diferença de altura que dá a sensação de profundidade.
     const sky = A.sprites.bg_sky;
     if (sky) this._tile(sky.img, -worldX * 0.10, GROUND_Y - 42 - sky.h);
     const city = A.sprites.bg_city;
@@ -1100,10 +1132,14 @@ export class Game {
     // RivalSet, que desliza suavemente entre as respostas do servidor (que vêm
     // a cada 4 s) e leva para fora de quadro quem se afasta ou some.
     // Os rótulos sobem em degraus para não colidirem entre si.
+    // O rótulo fica acima da CABEÇA, medida pelo sprite. Era um deslocamento
+    // fixo de 52px, feito para o corredor da v1; com o sprite de 56px da v2 o
+    // nome caía no peito do próprio rival.
+    const altRival = spriteSize('rival_run').h || 56;
     this.mpVisiveis.forEach((r, i) => {
       drawAnim('rival_run', heroFrame + (r.id.charCodeAt(0) % 8), r.x, GROUND_Y);
       const rotulo = r.nome ? `${r.nome} ${r.distM}M` : `${r.distM}M`;
-      drawTextShadow(ctx, rotulo, r.x, GROUND_Y - 52 - i * 9, 0, 3, 'center');
+      drawTextShadow(ctx, rotulo, r.x, GROUND_Y - altRival - 8 - i * 9, 0, 3, 'center');
     });
 
     // Herói
@@ -1139,7 +1175,7 @@ export class Game {
 
   _drawHud() {
     const tr = this.tracker;
-    rect(0, 0, W, HUD_H, 0);
+    rect(0, 0, W, HUD_H, COR.PAINEL);
 
     const km = (tr.distanceM / 1000);
     drawText(ctx, `${km.toFixed(2)}KM`, 3, 2, 3);
@@ -1194,7 +1230,7 @@ export class Game {
     L(y, `JOGO ${(tr.distanceM / 1000).toFixed(2)}KM  GPS ${(tr.gpsDistanceM / 1000).toFixed(2)}KM`); y += 9;
     L(y, `TELA ${this.shownM.toFixed(1)}M DIF ${(tr.distanceM - this.shownM).toFixed(1)}`);
 
-    drawText(ctx, 'B FECHA', W / 2, H - 9, 1, 'center');
+    drawText(ctx, 'B FECHA', W / 2, H - 9, COR.CLARO, 'center');
   }
 
   _drawPause() {
@@ -1244,7 +1280,7 @@ export class Game {
     });
 
     if (p >= 2) {
-      rect(0, 40, W, 34, 0);
+      rect(0, 40, W, 34, COR.PAINEL);
       drawText(ctx, 'META CUMPRIDA!', W / 2, 45, 3, 'center');
       drawText(ctx, ` ${this.coins} MOEDAS`, W / 2, 58, 2, 'center');
     }
@@ -1259,8 +1295,8 @@ export class Game {
   }
 
   _drawResult() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, this.chegou ? 'META CUMPRIDA!' : 'CORRIDA ENCERRADA', W / 2, 4, 3, 'center');
 
     const tr = this.tracker;
@@ -1282,29 +1318,38 @@ export class Game {
       drawText(ctx, v, W - 6, y, 0, 'right');
     });
 
-    // O gato fica na faixa livre entre os números e a barra, sem cobrir texto.
-    // A skin usada na corrida, parada: ela já terminou.
+    // Retrato da skin usada, parada — ela já terminou de correr.
+    //
+    // Em escala cheia o sprite tem 56px e atravessa a coluna inteira de
+    // números. Em metade ele cabe na faixa livre entre a última linha e a
+    // barra de progresso, e continua reconhecível: é retrato, não jogabilidade.
     const pele = this._pele();
-    drawAnim(`${pele}_idle`, Math.floor(this.t * 4), W / 2, 94);
+    const a = A.anims[`${pele}_idle`];
+    if (a) {
+      const f = Math.floor(this.t * 4) % a.frames;
+      const w2 = Math.round(a.fw / 2), h2 = Math.round(a.fh / 2);
+      ctx.drawImage(a.img, f * a.fw, 0, a.fw, a.fh,
+        Math.round(W / 2 - w2 / 2), 94 - h2, w2, h2);
+    }
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
     progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);
     drawText(ctx, `${pct}%`, W / 2, 107, 0, 'center');
 
     const d = store.load();
-    rect(0, 116, W, H - 116, 0);
+    rect(0, 116, W, H - 116, COR.PAINEL);
     drawText(ctx, `TOTAL \x05${d.coins}   ${d.totalKm.toFixed(1)}KM`, W / 2, 118, 2, 'center');
     if (Math.floor(this.t * 1.6) % 2 === 0) {
       drawText(ctx, 'START CORRE DE NOVO', W / 2, 127, 3, 'center');
     }
-    drawText(ctx, 'B MENU  SELECT HISTORICO', W / 2, 136, 1, 'center');
+    drawText(ctx, 'B MENU  SELECT HISTORICO', W / 2, 136, COR.CLARO, 'center');
   }
 
   // ---------------- HISTÓRICO ----------------
 
   _drawHistory() {
-    clear(3);
-    rect(0, 0, W, 14, 0);
+    clear(COR.PAPEL);
+    rect(0, 0, W, 14, COR.PAINEL);
     drawText(ctx, 'HISTORICO', W / 2, 4, 3, 'center');
 
     const runs = store.load().runs;

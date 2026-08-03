@@ -87,7 +87,7 @@ const FOLD = {
 
 const atlases = [];   // um canvas por índice de cor
 
-/** Pré-renderiza a fonte em 4 atlas (um por cor da paleta). */
+/** Pré-renderiza a fonte num atlas por cor da paleta. */
 export function buildFont(paletteHex) {
   const keys = Object.keys(GLYPHS);
   const index = new Map();
