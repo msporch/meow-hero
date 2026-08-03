@@ -48,6 +48,47 @@ export const CHARACTERS = {
   },
 };
 
+/**
+ * Skins do herói. Mesmo tamanho e estilo do personagem padrão, para poderem
+ * ser trocadas sem mexer em âncoras nem no posicionamento da cena.
+ */
+const SKIN_BASE = {
+  body_type: 'humanoid',
+  mode: 'standard',
+  n_directions: 4,
+  size: 32,
+  view: 'side',
+  outline: 'single color black outline',
+  shading: 'flat shading',
+  detail: 'low detail',
+  proportions: '{"type": "preset", "name": "heroic"}',
+  text_guidance_scale: 9,
+};
+
+const SKIN_ANIMS = [
+  { key: 'run',  template_animation_id: 'running-8-frames', directions: ['east'] },
+  { key: 'idle', template_animation_id: 'breathing-idle',   directions: ['east'] },
+];
+
+/** Monta a entrada de personagem de uma skin. */
+function skin(id, description, name) {
+  return {
+    create: { ...SKIN_BASE, description, name },
+    animations: SKIN_ANIMS.map(a => ({ ...a, animation_name: `${id}_${a.key}` })),
+  };
+}
+
+export const SKINS = {
+  neon: skin('neon', 'runner in a bright windbreaker with reflective stripes and cap, night jogger', 'Skin Neon'),
+  ninja: skin('ninja', 'ninja in dark outfit with face mask and scarf, agile runner', 'Skin Ninja'),
+  robo: skin('robo', 'friendly boxy robot with antenna and glowing eye, running', 'Skin Robo'),
+  astro: skin('astro', 'astronaut in a white space suit with round helmet, running', 'Skin Astro'),
+  esqueleto: skin('esqueleto', 'cartoon skeleton wearing a hoodie and sneakers, running', 'Skin Esqueleto'),
+};
+
+// As skins entram no mesmo pipeline dos personagens.
+Object.assign(CHARACTERS, SKINS);
+
 // --- Sprites soltos (create_image_pixflux, fundo transparente, paleta DMG forçada) ---
 export const SPRITES = {
   coin:        { description: 'shiny round gold coin with a cat paw print engraved on it, thick black outline', width: 32, height: 32, view: 'side' },
@@ -68,7 +109,7 @@ export const SPRITES = {
 export const SCENES = {
   bg_sky:   { description: 'distant city skyline silhouette against an empty sky, simple flat retro game background layer', width: 160, height: 72,  no_background: false, detail: 'low detail' },
   bg_city:  { description: 'row of simple city buildings with windows, flat retro game parallax background layer',          width: 160, height: 88,  no_background: false, detail: 'low detail' },
-  title_art:{ description: 'a boy running fast on a city street towards a small kitten sitting on the road, retro game title screen illustration', width: 160, height: 144, no_background: false, detail: 'medium detail' },
+  title_art:{ description: 'a boy running fast down a city street grabbing big gold coins floating in the air, retro game title screen illustration', width: 160, height: 144, no_background: false, detail: 'medium detail' },
 };
 
 // --- Tileset do chão (create_sidescroller_tileset) ---

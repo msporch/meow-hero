@@ -21,6 +21,23 @@ export const DEFAULTS = {
   maxPlayers: 12,    // teto de vizinhos devolvidos
 };
 
+/**
+ * Limpa o nome do jogador, que é escolhido por ele e mostrado aos outros.
+ *
+ * Acentos são dobrados na letra base em vez de removidos — senão "JOSÉ" viraria
+ * "JOS". Depois sobra só o que a fonte 5x7 do jogo sabe desenhar.
+ */
+export function limpaNome(bruto) {
+  return String(bruto ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // é → e
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 8)
+    .trim();
+}
+
 /** Validação defensiva: a entrada vem da rede. */
 export function sanitize(body) {
   if (!body || typeof body !== 'object') return null;
@@ -37,6 +54,7 @@ export function sanitize(body) {
 
   return {
     id, lat, lon,
+    nome: limpaNome(body.nome),
     runM: Math.round(runM),
     goalKm: isFinite(goalKm) && goalKm > 0 && goalKm <= 200 ? goalKm : null,
   };
@@ -80,6 +98,7 @@ export class Presence {
 
       out.push({
         id: outroId,
+        nome: p.nome || '',
         distM: Math.round(distM),
         aheadM: Math.round(p.runM - eu.runM),
         goalKm: p.goalKm,

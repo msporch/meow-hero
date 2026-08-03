@@ -7,7 +7,7 @@
 // O objetivo é correr a distância escolhida e juntar moedas. Não há tempo
 // limite nem derrota: o cronômetro conta para cima e serve de registro.
 import {
-  W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOALS,
+  W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOAL_MIN, GOAL_MAX, stepGoal,
   CHUNK_PX, MILK_COINS, CUE_HALFWAY,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
   MP_MAX_ON_SCREEN,
@@ -20,14 +20,26 @@ import { Tracker, MODES, formatTime, formatKmh } from './tracker.js';
 import { sfx, resumeAudio, vibrate, setAudioEnabled } from './audio.js';
 import * as store from './storage.js';
 import { Multiplayer } from './multiplayer.js';
+import * as skins from './skins.js';
+import { SKINS } from './skins.js';
 
 const S = {
   TITLE: 'title', ARM: 'arm', RUN: 'run',
   PAUSE: 'pause', FINALE: 'finale', RESULT: 'result', HISTORY: 'history',
   CONSENT: 'consent',
-  // Menu em subseções: modo → meta → opções → correr.
-  MODO: 'modo', META: 'meta', OPCOES: 'opcoes',
+  // Menu em subseções: principal → modo → meta → opções → correr.
+  NOME: 'nome', PRINCIPAL: 'principal', MODO: 'modo', META: 'meta', OPCOES: 'opcoes',
+  LOJA: 'loja',
 };
+
+/** Grade de caracteres da tela de nome, no espírito dos jogos da época. */
+const GRADE_NOME = [
+  'ABCDEFGHIJ',
+  'KLMNOPQRST',
+  'UVWXYZ0123',
+  '456789 \x01\x02',   // \x01 = apagar, \x02 = confirmar
+];
+const NOME_MAX = 8;
 
 export class Game {
   constructor() {
@@ -43,6 +55,10 @@ export class Game {
     this.mode = MODES.some(m => m.id === d.lastMode) ? d.lastMode : 'steps+gps';
     this.online = false;        // escolhido na primeira subseção do menu
     this.row = 0;               // linha selecionada na subseção atual
+
+    this.nome = store.get('nome') || '';
+    this.nomeSel = 0;
+    this.lojaSel = 0;
 
     this.coins = 0;
     this.elapsed = 0;
@@ -158,6 +174,9 @@ export class Game {
 
     switch (this.state) {
       case S.TITLE: this._drawTitle(); break;
+      case S.NOME: this._drawNome(); break;
+      case S.PRINCIPAL: this._drawPrincipal(); break;
+      case S.LOJA: this._drawLoja(); break;
       case S.MODO: this._drawModo(); break;
       case S.META: this._drawMeta(); break;
       case S.OPCOES: this._drawOpcoes(); break;
@@ -186,6 +205,9 @@ export class Game {
 
     switch (this.state) {
       case S.TITLE: return this._inputTitle(key);
+      case S.NOME: return this._inputNome(key);
+      case S.PRINCIPAL: return this._inputPrincipal(key);
+      case S.LOJA: return this._inputLoja(key);
       case S.MODO: return this._inputModo(key);
       case S.META: return this._inputMeta(key);
       case S.OPCOES: return this._inputOpcoes(key);
@@ -194,16 +216,130 @@ export class Game {
       case S.RUN: return this._inputRun(key);
       case S.PAUSE: return this._inputPause(key);
       case S.RESULT: return this._inputResult(key);
-      case S.HISTORY: if (key === 'b' || key === 'a' || key === 'start') { sfx.back(); this.go(S.TITLE); } return;
+      case S.HISTORY: if (key === 'b' || key === 'a' || key === 'start') { sfx.back(); this.row = 3; this.go(S.PRINCIPAL); } return;
       case S.FINALE: return;
     }
   }
 
   // ---------------- TÍTULO ----------------
 
+  // ---------------- NOME DO JOGADOR ----------------
+
+  /**
+   * Entrada de nome por grade, navegada com o D-pad.
+   *
+   * É o que dá para fazer com os botões do console — teclado do sistema exigiria
+   * um <input> por cima do canvas e quebraria a ilusão. Aparece uma vez, na
+   * primeira abertura, e depois só pela loja/opções.
+   */
+  _inputNome(key) {
+    const linhas = GRADE_NOME;
+    const nl = linhas.length, nc = linhas[0].length;
+    let [r, c] = [Math.floor(this.nomeSel / nc), this.nomeSel % nc];
+
+    if (key === 'up') { r = (r + nl - 1) % nl; sfx.select(); }
+    else if (key === 'down') { r = (r + 1) % nl; sfx.select(); }
+    else if (key === 'left') { c = (c + nc - 1) % nc; sfx.select(); }
+    else if (key === 'right') { c = (c + 1) % nc; sfx.select(); }
+    else if (key === 'b') { this._nomeApaga(); return; }
+    else if (key === 'start') { this._nomeConfirma(); return; }
+    else if (key === 'a' || key === 'tap') {
+      const ch = linhas[r][c];
+      if (ch === '\x01') this._nomeApaga();
+      else if (ch === '\x02') this._nomeConfirma();
+      else if (this.nome.length < NOME_MAX) { this.nome += ch; sfx.select(); }
+      else sfx.back();
+      return;
+    }
+    this.nomeSel = r * nc + c;
+  }
+
+  _nomeApaga() {
+    if (!this.nome.length) { sfx.back(); return; }
+    this.nome = this.nome.slice(0, -1);
+    sfx.select();
+  }
+
+  _nomeConfirma() {
+    const limpo = this.nome.trim();
+    if (!limpo) { this.say('ESCOLHA UM NOME', 2); sfx.back(); return; }
+    this.nome = limpo;
+    store.set('nome', limpo);
+    this.mp.name = limpo;
+    sfx.confirm();
+    this.row = 0;
+    this.go(S.PRINCIPAL);
+  }
+
+  _drawNome() {
+    clear(3);
+    rect(0, 0, W, 14, 0);
+    drawText(ctx, 'SEU NOME', W / 2, 4, 3, 'center');
+
+    // Campo com o nome digitado e cursor piscando.
+    panel(28, 20, W - 56, 18);
+    const cursor = this.nome.length < NOME_MAX && Math.floor(this.t * 3) % 2 === 0 ? '_' : ' ';
+    drawText(ctx, this.nome + cursor, W / 2, 26, 0, 'center');
+
+    const nc = GRADE_NOME[0].length;
+    const cw = 15, ch = 13, x0 = 6, y0 = 46;
+
+    GRADE_NOME.forEach((linha, r) => {
+      for (let c = 0; c < nc; c++) {
+        const idx = r * nc + c;
+        const x = x0 + c * cw, y = y0 + r * ch;
+        const on = idx === this.nomeSel;
+        if (on) rect(x - 1, y - 2, cw - 1, ch - 1, 2);
+        const raw = linha[c];
+        const rot = raw === '\x01' ? '<' : raw === '\x02' ? 'OK' : raw === ' ' ? '_' : raw;
+        drawText(ctx, rot, x + 4, y, 0);
+      }
+    });
+
+    rect(0, H - 22, W, 22, 0);
+    drawText(ctx, 'A ESCOLHE   B APAGA', W / 2, H - 18, 3, 'center');
+    drawText(ctx, 'START CONFIRMA', W / 2, H - 9, 2, 'center');
+  }
+
+  // ---------------- MENU PRINCIPAL ----------------
+
+  _itensPrincipal() {
+    return [
+      { id: 'jogar', label: 'JOGAR', hint: 'Escolha o modo e a meta.' },
+      { id: 'loja', label: 'LOJA', hint: 'Skins novas para o seu corredor.' },
+      { id: 'nome', label: 'NOME', hint: `Voce e ${this.nome || '???'}.` },
+      { id: 'hist', label: 'HISTORICO', hint: 'Suas corridas anteriores.' },
+    ];
+  }
+
+  _inputPrincipal(key) {
+    this._menuNav(this._itensPrincipal(), key, {
+      onVoltar: () => this.go(S.TITLE),
+      onEscolher: it => {
+        this.row = 0;
+        if (it.id === 'jogar') this.go(S.MODO);
+        else if (it.id === 'loja') { this.lojaSel = 0; this.go(S.LOJA); }
+        else if (it.id === 'nome') { this.nomeSel = 0; this.go(S.NOME); }
+        else this.go(S.HISTORY);
+      },
+    });
+  }
+
+  _drawPrincipal() {
+    const d = store.load();
+    this._drawMenu('MEOW HERO', this._itensPrincipal(), {
+      dica: this._itensPrincipal()[this.row]?.hint,
+      rodape: `\x05${d.coins}   ${d.totalKm.toFixed(1)}KM`,
+    });
+  }
+
   _inputTitle(key) {
-    if (key === 'start' || key === 'a' || key === 'tap') { sfx.confirm(); this.row = 0; this.go(S.MODO); }
-    else if (key === 'select') { sfx.select(); this.menuIndex = 0; this.go(S.HISTORY); }
+    if (key === 'start' || key === 'a' || key === 'tap') {
+      sfx.confirm();
+      this.row = 0;
+      // Sem nome ainda: pede antes de qualquer outra coisa.
+      if (!this.nome) { this.nomeSel = 0; this.go(S.NOME); } else this.go(S.PRINCIPAL);
+    }
   }
 
   _drawTitle() {
@@ -276,6 +412,89 @@ export class Game {
     drawText(ctx, rodape || 'A ESCOLHE   B VOLTA', W / 2, 132, 0, 'center');
   }
 
+  // ---------------- LOJA ----------------
+
+  _inputLoja(key) {
+    const n = SKINS.length;
+    if (key === 'up') { this.lojaSel = (this.lojaSel + n - 1) % n; sfx.select(); }
+    else if (key === 'down') { this.lojaSel = (this.lojaSel + 1) % n; sfx.select(); }
+    else if (key === 'b' || key === 'select') { sfx.back(); this.row = 1; this.go(S.PRINCIPAL); }
+    else if (key === 'a' || key === 'start' || key === 'tap') this._lojaAcao();
+  }
+
+  /** A em cima de uma skin: equipa se já é sua, compra se dá para comprar. */
+  _lojaAcao() {
+    const s = SKINS[this.lojaSel];
+
+    if (skins.isOwned(s.id)) {
+      skins.equip(s.id);
+      this.say(`${s.nome} EQUIPADA`, 1.8);
+      sfx.confirm();
+      return;
+    }
+
+    if (s.coins != null) {
+      const r = skins.buyWithCoins(s.id);
+      if (r === 'ok') { this.say(`${s.nome} COMPRADA`, 2); sfx.win(); }
+      else if (r === 'sem-moedas') { this.say('MOEDAS INSUFICIENTES', 2); sfx.back(); }
+      else sfx.back();
+      return;
+    }
+
+    // Skin paga: o jogo não cobra nada, só encaminha para o provedor.
+    const url = skins.payLink(s.id);
+    if (!url) { this.say('COMPRA INDISPONIVEL', 2.5); sfx.back(); return; }
+    sfx.confirm();
+    window.open(url, '_blank', 'noopener');
+    this.say('ABRINDO PAGAMENTO', 2.5);
+  }
+
+  _drawLoja() {
+    clear(3);
+    rect(0, 0, W, 14, 0);
+    drawText(ctx, 'LOJA', W / 2, 4, 3, 'center');
+
+    const saldo = store.get('coins') || 0;
+    drawText(ctx, `\x05${saldo}`, W - 4, 4, 2, 'right');
+
+    // Janela de 4 itens em volta da seleção.
+    const VIS = 4, n = SKINS.length;
+    const ini = Math.min(Math.max(0, this.lojaSel - 1), Math.max(0, n - VIS));
+
+    for (let i = 0; i < Math.min(VIS, n); i++) {
+      const idx = ini + i;
+      const s = SKINS[idx];
+      const y = 19 + i * 12;
+      const on = idx === this.lojaSel;
+      const tem = skins.isOwned(s.id);
+      const usando = skins.equipped().id === s.id;
+
+      if (on) { rect(3, y - 3, W - 6, 12, 2); rectOutline(3, y - 3, W - 6, 12, 0); }
+      drawText(ctx, s.nome, 7, y, 0);
+      drawText(ctx, usando ? 'EM USO' : tem ? 'SUA' : skins.formatPrice(s), W - 12, y, tem ? 1 : 0, 'right');
+    }
+
+    if (ini > 0) drawText(ctx, '\x02', W - 4, 19, 1);
+    if (ini + VIS < n) drawText(ctx, '\x02', W - 4, 19 + (VIS - 1) * 12, 1);
+
+    // Prévia da skin selecionada, correndo.
+    const sel = SKINS[this.lojaSel];
+    drawAnim(`${sel.anim}_run`, Math.floor(this.t * 10), 34, 104)
+      || drawAnim('hero_run', Math.floor(this.t * 10), 34, 104);
+
+    const info = skins.isOwned(sel.id)
+      ? sel.desc
+      : sel.coins != null
+        ? `${sel.desc} Custa ${sel.coins} moedas.`
+        : (skins.payLink(sel.id) ? `${sel.desc} Abre o pagamento no navegador.`
+          : `${sel.desc} Venda ainda nao configurada.`);
+    wrapText(info, 96).slice(0, 4).forEach((l, i) => drawText(ctx, l, 60, 72 + i * LINE_H, 0));
+
+    rect(0, H - 12, W, 12, 0);
+    drawText(ctx, skins.isOwned(sel.id) ? 'A EQUIPA   B VOLTA' : 'A COMPRA   B VOLTA',
+      W / 2, H - 9, 3, 'center');
+  }
+
   // ---------------- MENU 1: modo de jogo ----------------
 
   _itensModo() {
@@ -287,7 +506,7 @@ export class Game {
 
   _inputModo(key) {
     this._menuNav(this._itensModo(), key, {
-      onVoltar: () => this.go(S.TITLE),
+      onVoltar: () => { this.row = 0; this.go(S.PRINCIPAL); },
       onEscolher: it => {
         if (it.id === 'online') {
           if (!this.mp.configured) { this.say('SEM SERVIDOR', 2.5); return; }
@@ -297,7 +516,6 @@ export class Game {
         } else {
           this.online = false;
         }
-        this.row = Math.max(0, GOALS.indexOf(this.goalKm));
         this.go(S.META);
       },
     });
@@ -316,14 +534,13 @@ export class Game {
   // ---------------- MENU 2: meta ----------------
 
   _inputMeta(key) {
-    const itens = GOALS.map(km => ({ km, label: `${km.toFixed(km % 1 ? 1 : 0)} KM` }));
-    // A lista é longa: rola em vez de mostrar tudo.
-    const n = itens.length;
-    if (key === 'up') { this.row = (this.row + n - 1) % n; sfx.select(); }
-    else if (key === 'down') { this.row = (this.row + 1) % n; sfx.select(); }
+    if (key === 'left' || key === 'right') {
+      const antes = this.goalKm;
+      this.goalKm = stepGoal(this.goalKm, key === 'right' ? 1 : -1);
+      if (this.goalKm !== antes) sfx.select();
+    }
     else if (key === 'b') { this.row = this.online ? 1 : 0; sfx.back(); this.go(S.MODO); }
     else if (key === 'a' || key === 'start' || key === 'tap') {
-      this.goalKm = itens[this.row].km;
       store.set('lastGoal', this.goalKm);
       sfx.confirm();
       this.row = 0;
@@ -331,37 +548,45 @@ export class Game {
     }
   }
 
+  /**
+   * Meta por slider, não por lista.
+   *
+   * Quem corre tem alvo próprio, e uma lista fixa nunca acerta o de todo mundo.
+   * O passo cresce com o número (0,5 km até 10, depois 1, depois 2) para não
+   * exigir dezenas de toques até a maratona — e os botões repetem enquanto
+   * ficam pressionados.
+   */
   _drawMeta() {
     clear(3);
     rect(0, 0, W, 14, 0);
     drawText(ctx, 'ESCOLHA A META', W / 2, 4, 3, 'center');
 
-    // Janela de 6 itens centrada na seleção.
-    const VIS = 6;
-    const n = GOALS.length;
-    let ini = Math.min(Math.max(0, this.row - 2), Math.max(0, n - VIS));
+    // Número grande, o que importa aqui.
+    const txt = `${this.goalKm.toFixed(this.goalKm % 1 ? 1 : 0)} KM`;
+    panel(30, 26, W - 60, 22);
+    drawText(ctx, txt, W / 2, 34, 0, 'center');
 
-    for (let i = 0; i < Math.min(VIS, n); i++) {
-      const idx = ini + i;
-      const km = GOALS[idx];
-      const y = 20 + i * 13;
-      const on = idx === this.row;
-      if (on) { rect(4, y - 3, W - 8, 13, 2); rectOutline(4, y - 3, W - 8, 13, 0); }
-      drawText(ctx, `${km.toFixed(km % 1 ? 1 : 0)} KM`, 16, y, 0);
-      // Estimativa a um trote de 8 min/km, só para dar noção de duração.
-      // Sem "~": a fonte 5x7 não tem esse caractere e ele sairia como "?".
-      drawText(ctx, formatTime(km * 8 * 60), W - 14, y, 1, 'right');
-      if (on) drawText(ctx, '\x03', 8, y, 0);
+    // Slider.
+    const x0 = 14, larg = W - 28, y = 62;
+    const t = (this.goalKm - GOAL_MIN) / (GOAL_MAX - GOAL_MIN);
+    rect(x0, y + 3, larg, 2, 1);
+    const cx = Math.round(x0 + t * larg);
+    rect(x0, y + 3, cx - x0, 2, 0);
+    rect(cx - 2, y, 5, 9, 0);
+
+    drawText(ctx, String(GOAL_MIN), x0, y + 13, 1);
+    drawText(ctx, String(GOAL_MAX), x0 + larg, y + 13, 1, 'right');
+
+    if (Math.floor(this.t * 3) % 2 === 0) {
+      drawText(ctx, '', 5, 34, 0);
+      drawText(ctx, '', W - 10, 34, 0);
     }
 
-    // Marcadores de rolagem na borda direita, fora da coluna de texto.
-    if (ini > 0) drawText(ctx, '\x02', W - 7, 20, 1);
-    if (ini + VIS < n) drawText(ctx, '\x02', W - 7, 20 + (Math.min(VIS, n) - 1) * 13, 1);
+    rect(0, 92, W, 34, 0);
+    wrapText('Segure o botao para andar mais rapido.', W - 12)
+      .slice(0, 2).forEach((l, i) => drawText(ctx, l, W / 2, 100 + i * LINE_H, 2, 'center'));
 
-    rect(0, 104, W, 22, 0);
-    drawText(ctx, 'A DIREITA E UMA ESTIMATIVA', W / 2, 107, 2, 'center');
-    drawText(ctx, 'DE DURACAO. NAO HA LIMITE.', W / 2, 116, 2, 'center');
-    drawText(ctx, 'A ESCOLHE   B VOLTA', W / 2, 132, 0, 'center');
+    drawText(ctx, 'A CONFIRMA   B VOLTA', W / 2, 132, 0, 'center');
   }
 
   // ---------------- MENU 3: outras opções ----------------
@@ -379,7 +604,7 @@ export class Game {
   _inputOpcoes(key) {
     const itens = this._itensOpcoes();
     this._menuNav(itens, key, {
-      onVoltar: () => { this.row = Math.max(0, GOALS.indexOf(this.goalKm)); this.go(S.META); },
+      onVoltar: () => this.go(S.META),
       onAlternar: (it, dir) => {
         if (it.id === 'rastreio') {
           const i = MODES.findIndex(m => m.id === this.mode);
@@ -411,7 +636,6 @@ export class Game {
       store.set('mpConsent', true);
       this.online = true;
       sfx.confirm();
-      this.row = Math.max(0, GOALS.indexOf(this.goalKm));
       this.go(S.META);
     } else if (key === 'b' || key === 'select') {
       // Recusar volta ao modo, com SOLO selecionado.
@@ -539,7 +763,7 @@ export class Game {
 
     // Animação de espera: o herói correndo no lugar.
     const f = Math.floor(this.t * 10);
-    drawAnim('hero_run', f, W / 2, 104);
+    drawAnim(`${skins.equipped().anim}_run`, f, W / 2, 104);
 
     const dots = '.'.repeat(1 + (Math.floor(this.t * 2) % 3));
     if (st === 'denied' || st === 'error') {
@@ -672,25 +896,7 @@ export class Game {
 
   // ---------------- desenho da corrida ----------------
 
-  /**
-   * Fração já percorrida da reta final (0 → 1). Serve para encenar a chegada:
-   * a 24 px/m o gato ficaria fora de quadro até os últimos metros, então a
-   * aproximação dele é roteirizada em coordenadas de tela.
-   */
-  _finaleT(worldX) {
-    const span = this.course.lengthPx - this.course.finaleStartPx;
-    if (span <= 0) return 1;
-    return Math.max(0, Math.min(1, (worldX - this.course.finaleStartPx) / span));
-  }
-
-  /** X de tela do gato durante a aproximação: entra pela direita e para à frente do herói. */
-  _catScreenX(worldX) {
-    const t = this._finaleT(worldX);
-    const from = W + 24, to = HERO_X + 52;
-    return from + (to - from) * t;
-  }
-
-  _drawWorld(worldX, { heroAnim = 'hero_run', heroFrame = 0, heroY = GROUND_Y, catX = null } = {}) {
+  _drawWorld(worldX, { heroAnim = 'hero_run', heroFrame = 0, heroY = GROUND_Y } = {}) {
     clear(3);
 
     // Céu
@@ -735,8 +941,6 @@ export class Game {
       }
     }
 
-    // Gato esperando na chegada.
-    if (catX != null) drawAnim('cat_sit', Math.floor(this.frame / 8), catX, GROUND_Y);
 
     // Outros jogadores correndo por perto. A posição de cada um é mantida pelo
     // RivalSet, que desliza suavemente entre as respostas do servidor (que vêm
@@ -744,7 +948,8 @@ export class Game {
     // Os rótulos sobem em degraus para não colidirem entre si.
     this.mpVisiveis.forEach((r, i) => {
       drawAnim('rival_run', heroFrame + (r.id.charCodeAt(0) % 8), r.x, GROUND_Y);
-      drawTextShadow(ctx, `${r.distM}M`, r.x, GROUND_Y - 52 - i * 9, 0, 3, 'center');
+      const rotulo = r.nome ? `${r.nome} ${r.distM}M` : `${r.distM}M`;
+      drawTextShadow(ctx, rotulo, r.x, GROUND_Y - 52 - i * 9, 0, 3, 'center');
     });
 
     // Herói
@@ -769,14 +974,11 @@ export class Game {
     // passo detectado e só desliga após alguns segundos parado de verdade.
     const moving = tr.moving;
     const cadence = Math.min(18, 5 + tr.displaySpeedMs * 3.2);
-    const anim = moving ? 'hero_run' : 'hero_idle';
+    const pele = skins.equipped().anim;
+    const anim = moving ? `${pele}_run` : `${pele}_idle`;
     const frame = moving ? Math.floor(this.elapsed * cadence) : Math.floor(this.elapsed * 3);
 
-    // Na reta final o gato aparece esperando na chegada — mascote, não resgate.
-    const inFinaleZone = worldX >= this.course.finaleStartPx;
-    const catX = inFinaleZone ? this._catScreenX(worldX) : null;
-
-    this._drawWorld(worldX, { heroAnim: anim, heroFrame: frame, catX });
+    this._drawWorld(worldX, { heroAnim: anim, heroFrame: frame });
     this._drawHud();
     if (this.debug) this._drawDebug();
   }
@@ -873,21 +1075,19 @@ export class Game {
   }
 
   /**
-   * Chegada. Sem resgate e sem derrota: o herói completa a distância, o gato
-   * comemora junto e o total de moedas aparece.
+   * Chegada. Sem resgate e sem derrota: o herói completa a distância e o total
+   * de moedas aparece.
    */
   _drawFinale() {
     const worldX = Math.min(this.shownM, this.course.goalM) * PX_PER_M;
     const p = this.finalePhase;
+    const pele = skins.equipped().anim;
 
     const chegando = p === 0;
     this._drawWorld(worldX, {
-      heroAnim: chegando ? 'hero_run' : 'hero_idle',
+      heroAnim: chegando ? `${pele}_run` : `${pele}_idle`,
       heroFrame: Math.floor(this.finaleT * (chegando ? 12 : 4)),
-      catX: chegando ? HERO_X + 52 : null,
     });
-
-    if (p >= 1) drawAnim('cat_happy', Math.floor(this.finaleT * 8), HERO_X + 24, GROUND_Y);
 
     if (p >= 2) {
       rect(0, 40, W, 34, 0);
@@ -900,7 +1100,7 @@ export class Game {
 
   _inputResult(key) {
     if (key === 'start' || key === 'a') { sfx.confirm(); this.row = 0; this.go(S.MODO); }
-    else if (key === 'b') { sfx.back(); this.go(S.TITLE); }
+    else if (key === 'b') { sfx.back(); this.row = 0; this.go(S.PRINCIPAL); }
     else if (key === 'select') { this.menuIndex = 0; this.go(S.HISTORY); }
   }
 
@@ -929,8 +1129,9 @@ export class Game {
     });
 
     // O gato fica na faixa livre entre os números e a barra, sem cobrir texto.
-    drawAnim(this.chegou ? 'cat_happy' : 'cat_sit',
-      Math.floor(this.t * (this.chegou ? 8 : 4)), W / 2, 94);
+    // No lugar do gato, a skin que você usou nesta corrida.
+    const pele = skins.equipped().anim;
+    drawAnim(`${pele}_${this.chegou ? 'run' : 'idle'}`, Math.floor(this.t * 8), W / 2, 94);
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
     progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);

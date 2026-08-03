@@ -43,11 +43,12 @@ export class RivalSet {
 
       const r = this.rivals.get(p.id);
       if (r) {
-        r.alvo = alvo; r.distM = p.distM; r.aheadM = p.aheadM; r.saindo = false;
+        r.alvo = alvo; r.distM = p.distM; r.aheadM = p.aheadM;
+        r.nome = p.nome || r.nome; r.saindo = false;
       } else {
         // Entra já pela borda do lado certo, correndo para o lugar dele.
         this.rivals.set(p.id, {
-          id: p.id, x: HERO_X + lado * (W + 20), alvo,
+          id: p.id, nome: p.nome || '', x: HERO_X + lado * (W + 20), alvo,
           distM: p.distM, aheadM: p.aheadM, saindo: false,
         });
       }
@@ -125,8 +126,9 @@ export class Multiplayer {
   constructor() {
     this.server = store.get('mpServer') || '';
     this.enabled = false;
-    this.players = [];          // [{id, distM, aheadM}] — cru, como veio
+    this.players = [];          // [{id, nome, distM, aheadM}] — cru, como veio
     this.rivals = new RivalSet();
+    this.name = store.get('nome') || '';
     this.status = 'off';        // 'off' | 'sem-servidor' | 'conectando' | 'ok' | 'erro'
     this.lastOkAt = 0;
     this.envios = 0;
@@ -187,6 +189,7 @@ export class Multiplayer {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: deviceId(),
+          nome: this.name,
           lat: position.lat,
           lon: position.lon,
           runM: Math.round(runM),

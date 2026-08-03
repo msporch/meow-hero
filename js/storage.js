@@ -10,6 +10,9 @@ const EMPTY = {
   audio: true,
   scanlines: true,
   stride: 0.78,
+  nome: '',              // nome do jogador, escolhido na primeira abertura
+  skin: 'padrao',
+  skinsOwned: ['padrao'],
   lastGoal: 5,
   lastDiff: 'normal',
   lastMode: 'steps+gps',

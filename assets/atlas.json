@@ -41,13 +41,6 @@
       "anchorX": 6,
       "anchorY": 15
     },
-    "puddle": {
-      "file": "sprites/puddle.png",
-      "w": 23,
-      "h": 10,
-      "anchorX": 12,
-      "anchorY": 10
-    },
     "hydrant": {
       "file": "sprites/hydrant.png",
       "w": 11,
@@ -75,20 +68,6 @@
       "h": 14,
       "anchorX": 4,
       "anchorY": 14
-    },
-    "truck": {
-      "file": "sprites/truck.png",
-      "w": 67,
-      "h": 42,
-      "anchorX": 34,
-      "anchorY": 42
-    },
-    "heart": {
-      "file": "sprites/heart.png",
-      "w": 11,
-      "h": 11,
-      "anchorX": 6,
-      "anchorY": 11
     },
     "bg_sky": {
       "file": "sprites/bg_sky.png",
@@ -129,29 +108,53 @@
     }
   },
   "anims": {
-    "cat_happy": {
-      "file": "sprites/cat_happy.png",
-      "fw": 27,
-      "fh": 24,
-      "frames": 8,
-      "anchorX": 14,
-      "anchorY": 24
+    "astro_idle": {
+      "file": "sprites/astro_idle.png",
+      "fw": 14,
+      "fh": 42,
+      "frames": 4,
+      "anchorX": 7,
+      "anchorY": 42
     },
-    "cat_pose": {
-      "file": "sprites/cat_pose.png",
-      "fw": 21,
-      "fh": 17,
+    "astro_pose": {
+      "file": "sprites/astro_pose.png",
+      "fw": 13,
+      "fh": 42,
       "frames": 1,
-      "anchorX": 11,
-      "anchorY": 17
+      "anchorX": 7,
+      "anchorY": 42
     },
-    "cat_sit": {
-      "file": "sprites/cat_sit.png",
-      "fw": 22,
-      "fh": 17,
+    "astro_run": {
+      "file": "sprites/astro_run.png",
+      "fw": 31,
+      "fh": 40,
       "frames": 8,
-      "anchorX": 11,
-      "anchorY": 17
+      "anchorX": 16,
+      "anchorY": 40
+    },
+    "esqueleto_idle": {
+      "file": "sprites/esqueleto_idle.png",
+      "fw": 11,
+      "fh": 42,
+      "frames": 4,
+      "anchorX": 6,
+      "anchorY": 42
+    },
+    "esqueleto_pose": {
+      "file": "sprites/esqueleto_pose.png",
+      "fw": 11,
+      "fh": 41,
+      "frames": 1,
+      "anchorX": 6,
+      "anchorY": 41
+    },
+    "esqueleto_run": {
+      "file": "sprites/esqueleto_run.png",
+      "fw": 33,
+      "fh": 40,
+      "frames": 8,
+      "anchorX": 17,
+      "anchorY": 40
     },
     "hero_idle": {
       "file": "sprites/hero_idle.png",
@@ -184,6 +187,78 @@
       "frames": 8,
       "anchorX": 17,
       "anchorY": 42
+    },
+    "neon_idle": {
+      "file": "sprites/neon_idle.png",
+      "fw": 11,
+      "fh": 42,
+      "frames": 4,
+      "anchorX": 6,
+      "anchorY": 42
+    },
+    "neon_pose": {
+      "file": "sprites/neon_pose.png",
+      "fw": 11,
+      "fh": 41,
+      "frames": 1,
+      "anchorX": 6,
+      "anchorY": 41
+    },
+    "neon_run": {
+      "file": "sprites/neon_run.png",
+      "fw": 31,
+      "fh": 40,
+      "frames": 8,
+      "anchorX": 16,
+      "anchorY": 40
+    },
+    "ninja_idle": {
+      "file": "sprites/ninja_idle.png",
+      "fw": 14,
+      "fh": 42,
+      "frames": 4,
+      "anchorX": 7,
+      "anchorY": 42
+    },
+    "ninja_pose": {
+      "file": "sprites/ninja_pose.png",
+      "fw": 14,
+      "fh": 42,
+      "frames": 1,
+      "anchorX": 7,
+      "anchorY": 42
+    },
+    "ninja_run": {
+      "file": "sprites/ninja_run.png",
+      "fw": 32,
+      "fh": 39,
+      "frames": 8,
+      "anchorX": 16,
+      "anchorY": 39
+    },
+    "robo_idle": {
+      "file": "sprites/robo_idle.png",
+      "fw": 12,
+      "fh": 44,
+      "frames": 4,
+      "anchorX": 6,
+      "anchorY": 44
+    },
+    "robo_pose": {
+      "file": "sprites/robo_pose.png",
+      "fw": 11,
+      "fh": 44,
+      "frames": 1,
+      "anchorX": 6,
+      "anchorY": 44
+    },
+    "robo_run": {
+      "file": "sprites/robo_run.png",
+      "fw": 31,
+      "fh": 43,
+      "frames": 8,
+      "anchorX": 16,
+      "anchorY": 43
     }
   }
 }

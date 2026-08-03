@@ -43,19 +43,39 @@ window.addEventListener('keydown', e => {
   send(k);
 });
 
-/** Liga um elemento a uma tecla virtual, com feedback visual. */
+/**
+ * Liga um elemento a uma tecla virtual, com feedback visual.
+ *
+ * Segurar repete a tecla: sem isso o slider da meta exigiria dezenas de toques
+ * para ir de 1 km à maratona. A repetição acelera depois de um tempo, para
+ * percorrer a faixa toda sem virar tortura.
+ */
+const REPEAT_DELAY = 380, REPEAT_FAST = 70, REPEAT_SLOW = 130, REPEAT_RAMP = 8;
+
 function bindButton(el, key) {
   if (!el) return;
-  const press = e => {
+  let timer = null, count = 0;
+
+  const stop = () => {
+    el.classList.remove('on');
+    if (timer) { clearTimeout(timer); timer = null; }
+    count = 0;
+  };
+
+  const repeat = () => {
+    count++;
+    send(key);
+    timer = setTimeout(repeat, count > REPEAT_RAMP ? REPEAT_FAST : REPEAT_SLOW);
+  };
+
+  el.addEventListener('pointerdown', e => {
     e.preventDefault();
     el.classList.add('on');
     send(key);
-  };
-  const release = () => el.classList.remove('on');
-  el.addEventListener('pointerdown', press);
-  el.addEventListener('pointerup', release);
-  el.addEventListener('pointercancel', release);
-  el.addEventListener('pointerleave', release);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(repeat, REPEAT_DELAY);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.addEventListener(ev, stop));
   el.addEventListener('contextmenu', e => e.preventDefault());
 }
 

@@ -14,17 +14,56 @@ Todos os gráficos e animações foram gerados pelo **MCP do PixelLab**.
 
 ## Como jogar
 
-O menu é dividido em etapas curtas, uma decisão por tela:
+Na primeira abertura o jogo pede **seu nome**, digitado numa grade navegada com
+o D-pad — é o que dá para fazer com os botões do console sem quebrar a ilusão
+com um teclado do sistema por cima. Ele aparece sobre você na cena para os
+outros jogadores.
 
-1. **START** na tela de título.
-2. **MODO DE JOGO** — solo ou multijogador.
-3. **ESCOLHA A META** — de 1 a 42,2 km. A coluna da direita é só uma
-   estimativa de duração a um trote de 8 min/km.
-4. **OUTRAS OPÇÕES** — rastreio e som, ambos com padrão. **START** começa de
+Depois vem o **menu principal**: JOGAR, LOJA, NOME e HISTÓRICO.
+
+Em JOGAR o fluxo é uma decisão por tela:
+
+1. **MODO DE JOGO** — solo ou multijogador.
+2. **ESCOLHA A META** — slider de 1 a 42 km. O passo cresce junto com o
+   número (0,5 km até 10, depois 1, depois 2) e **segurar o botão repete**,
+   então dá para atravessar a faixa inteira rápido.
+3. **OUTRAS OPÇÕES** — rastreio e som, ambos com padrão. **START** começa de
    qualquer linha.
-5. Guarde o celular no bolso e corra.
+4. Guarde o celular no bolso e corra.
 
 **B** volta uma etapa em qualquer tela.
+
+## Loja e skins
+
+Seis skins, todas geradas pelo PixelLab com **exatamente os mesmos parâmetros**
+do corredor padrão (32 px, vista lateral, *flat shading*, contorno preto) e
+passando pelo mesmo pipeline de demake — por isso trocar de skin não mexe em
+âncora nem em posicionamento.
+
+| Skin | Preço |
+|---|---|
+| Clássico | grátis |
+| Neon | 400 moedas |
+| Ninja | 1.500 moedas |
+| Robô | 4.000 moedas |
+| Astro | R$ 4,90 |
+| Esqueleto | R$ 9,90 |
+
+As de moeda funcionam por completo: compram, equipam e descontam do cofrinho.
+
+### Sobre as skins pagas
+
+**O jogo não processa pagamento e não toca em dado de cartão.** Ele só abre o
+link de checkout que você configurar em [`js/payments.js`](js/payments.js) —
+Stripe Payment Link, Mercado Pago, PagSeguro, qualquer um que gere uma URL.
+Enquanto o link estiver vazio, a loja mostra **COMPRA INDISPONÍVEL** em vez de
+fingir uma venda.
+
+Falta um passo que depende da sua conta no provedor: **liberar a skin depois do
+pagamento confirmado**. Fazer isso no navegador seria inútil — qualquer um
+contornaria. O caminho correto é o webhook do provedor avisar o servidor em
+`server/` e ele conceder a skin ao aparelho. Isso exige as chaves da sua conta,
+que eu não devo manipular.
 
 ### Modos de rastreio
 
@@ -130,6 +169,8 @@ js/
   course.js             geração procedural do percurso a partir da meta
   storage.js            moedas, corridas completas e histórico
   multiplayer.js        cliente de presença e posição dos rivais na tela
+  skins.js              catálogo de skins, compra e equipar
+  payments.js           links de checkout das skins pagas (você configura)
   game.js               máquina de estados e telas
   main.js               entrada, input, loop, instalação
 assets/

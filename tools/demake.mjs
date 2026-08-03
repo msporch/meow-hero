@@ -166,11 +166,32 @@ for (const f of files) {
   if (mm) (groups[mm[1]] ??= []).push({ n: Number(mm[2]), f });
 }
 
+/**
+ * Empurra o sprite para a metade escura da paleta.
+ *
+ * O fundo do jogo é achatado nos tons claros (ver flatten), então um
+ * personagem claro simplesmente desaparece — foi o que aconteceu com as skins
+ * Neon e Astro, que sumiram contra os prédios. Aqui os 4 níveis viram 3
+ * (0, 1, 2), preservando contorno e sombreado mas garantindo que o primeiro
+ * plano sempre tenha mais peso que o cenário.
+ */
+function paraPrimeiroPlano(png) {
+  const nivel = new Map(DMG.map((c, i) => [c.join(','), i]));
+  for (let i = 0; i < png.data.length; i += 4) {
+    if (png.data[i + 3] < ALPHA_CUT) continue;
+    const atual = nivel.get(`${png.data[i]},${png.data[i + 1]},${png.data[i + 2]}`) ?? 0;
+    const novo = Math.round(atual * 2 / 3);
+    const [r, g, b] = DMG[novo];
+    png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b;
+  }
+  return png;
+}
+
 for (const [name, list] of Object.entries(groups)) {
   list.sort((a, b) => a.n - b.n);
   const pngs = list.map(e => read(path.join(RAW, e.f)));
   const range = lumRange(pngs);
-  const q = pngs.map(p => quantize(p, range, { dither: false }));
+  const q = pngs.map(p => paraPrimeiroPlano(quantize(p, range, { dither: false })));
   const box = unionBBox(q);
   const framesC = q.map(p => crop(p, box));
   const out = strip(framesC);

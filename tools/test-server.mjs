@@ -49,7 +49,26 @@ console.log('\n— privacidade: coordenada nunca sai —');
   check('resposta não traz lat', !('lat' in viz[0]), `→ ${bruto}`);
   check('resposta não traz lon', !('lon' in viz[0]));
   check('nenhuma coordenada no json', !bruto.includes('23.5') && !bruto.includes('46.6'), `→ ${bruto}`);
-  check('só campos previstos', Object.keys(viz[0]).sort().join(',') === 'aheadM,distM,goalKm,id');
+  // Lista fechada de propósito: qualquer campo novo na resposta tem de passar
+  // por aqui, para não vazar algo sem querer.
+  check('só campos previstos', Object.keys(viz[0]).sort().join(',') === 'aheadM,distM,goalKm,id,nome');
+}
+
+console.log('\n— nome do jogador é higienizado —');
+{
+  const limpo = t => sanitize({ ...entrada(ID_A, -23.55, 0), nome: t })?.nome;
+  check('maiúsculas', limpo('mike') === 'MIKE', `→ ${limpo('mike')}`);
+  check('corta em 8 caracteres', limpo('ABCDEFGHIJKLM') === 'ABCDEFGH', `→ ${limpo('ABCDEFGHIJKLM')}`);
+  check('remove marcacao', limpo('<b>Ana</b>') === 'BANAB', `→ ${limpo('<b>Ana</b>')}`);
+  check('acento vira letra base', limpo('José') === 'JOSE', `→ ${limpo('José')}`);
+  check('nao sobra espaco na ponta', limpo('  ana  ') === 'ANA', `→ ${JSON.stringify(limpo('  ana  '))}`);
+  check('remove quebras de linha', !/[\n\r]/.test(limpo('a\nb') ?? ''), `→ ${JSON.stringify(limpo('a\nb'))}`);
+  check('sem nome vira string vazia', limpo(undefined) === '');
+
+  const p = new Presence();
+  p.update(sanitize({ ...entrada(ID_A, -23.55, 0), nome: 'MIKE' }));
+  const viz = p.update(sanitize({ ...entrada(ID_B, norte(-23.55, 50), 0), nome: 'ANA' }));
+  check('nome chega ao vizinho', viz[0].nome === 'MIKE', `→ ${viz[0].nome}`);
 }
 
 console.log('\n— jogador some quando para de enviar —');

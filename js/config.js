@@ -20,8 +20,30 @@ export const HUD_H = 22;
 /** Posição X fixa do herói na tela (centro do sprite). */
 export const HERO_X = 40;
 
-/** Distâncias-alvo oferecidas na tela de meta (km). */
-export const GOALS = [1, 2, 3, 5, 6, 8, 10, 15, 21.1, 42.2];
+/**
+ * Meta de distância: faixa contínua, ajustada por um slider.
+ *
+ * Era uma lista fixa de distâncias. Vira faixa porque quem corre tem alvo
+ * próprio — e o passo cresce junto com o número, para não exigir oitenta
+ * toques até chegar na maratona.
+ */
+export const GOAL_MIN = 1;
+export const GOAL_MAX = 42;
+
+/** Passo do slider na posição atual: fino no começo, largo no fim. */
+export function goalStep(km) {
+  if (km < 10) return 0.5;
+  if (km < 20) return 1;
+  return 2;
+}
+
+/** Move a meta um passo, mantendo-a alinhada e dentro da faixa. */
+export function stepGoal(km, dir) {
+  const passo = goalStep(dir > 0 ? km : km - 0.01);
+  const bruto = km + dir * passo;
+  const arredondado = Math.round(bruto / passo) * passo;
+  return Math.min(GOAL_MAX, Math.max(GOAL_MIN, Number(arredondado.toFixed(1))));
+}
 
 /**
  * Não há tempo limite nem condição de derrota: o objetivo é correr a distância
