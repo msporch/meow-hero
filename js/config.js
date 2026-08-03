@@ -23,21 +23,26 @@ export const HERO_X = 40;
 /** Distâncias-alvo oferecidas na tela de meta (km). */
 export const GOALS = [1, 2, 3, 5, 6, 8, 10, 15, 21.1, 42.2];
 
-/** Ritmos oferecidos (min/km) — definem o tempo limite. */
-export const PACES = [4, 5, 6, 7, 8, 9, 10, 12, 15];
+/**
+ * Não há tempo limite nem condição de derrota: o objetivo é correr a distância
+ * e juntar moedas. O cronômetro conta para cima, como registro da corrida.
+ *
+ * Por isso também não há escolha de ritmo nem de dificuldade — eram só formas
+ * de ajustar um limite que deixou de existir.
+ */
+
+/** Moedas ganhas por caixa de leite. */
+export const MILK_COINS = 25;
 
 /** Comprimento de um "chunk" do percurso, em pixels de mundo. */
 export const CHUNK_PX = 320;
 
 /**
- * Zona final (cinematográfica) — últimos N metros.
- * A 24 px/m, uma tela de 160px mostra ~6,7 m de mundo: 12 m equivalem a umas
- * duas telas de aproximação, o suficiente para ver o gato e o caminhão chegando.
+ * Zona de chegada — últimos N metros.
+ * A 24 px/m, uma tela de 160px mostra ~6,7 m de mundo: 12 m dão umas duas
+ * telas de aproximação até a linha de chegada.
  */
 export const FINALE_M = 12;
-
-/** Bônus de tempo por caixa de leite (segundos). */
-export const MILK_SECONDS = 20;
 
 /** Filtros de GPS. */
 export const GPS_MAX_ACCURACY = 30;   // m — descarta fixes piores que isso
@@ -103,25 +108,12 @@ export const SHOWN_SNAP_M = 100;       // acima disso ressincroniza direto
 
 /**
  * O celular fica no bolso durante a corrida: o retorno é sonoro e tátil.
- * Avisos a cada quilômetro, na metade e quando o tempo aperta.
+ * Avisos a cada quilômetro e na metade do percurso.
  */
 export const CUE_HALFWAY = true;
-export const CUE_LOW_TIME_S = 120;    // avisa quando faltarem 2 min
 
 /** Chave do armazenamento local. */
 export const SAVE_KEY = 'meowhero.save.v1';
-
-/**
- * Fantasma: um corredor na cena vindo da sua melhor corrida naquela meta.
- *
- * A corrida guarda a distância a cada GHOST_TRACE_S segundos; o fantasma é
- * essa curva reproduzida no tempo. Como 1 m vale 24 px de mundo, a diferença
- * é comprimida na tela — senão ele sumiria de quadro com 4 m de vantagem.
- */
-export const GHOST_TRACE_S = 5;        // intervalo de amostragem do traçado
-export const GHOST_TRACE_MAX = 900;    // teto de amostras guardadas por corrida
-export const GHOST_PX_PER_M = 4;       // compressão da diferença na tela
-export const GHOST_MAX_OFFSET = 64;    // px — além disso encosta na borda
 
 /**
  * Multijogador.
@@ -134,4 +126,17 @@ export const MP_INTERVAL_MS = 4000;    // frequência de envio da posição
 export const MP_TIMEOUT_MS = 6000;     // desiste da requisição depois disso
 export const MP_STALE_MS = 20000;      // sem resposta por tanto tempo, limpa a cena
 export const MP_MAX_ON_SCREEN = 3;     // vizinhos desenhados ao mesmo tempo
-export const MP_NEAR_M = 400;          // dentro disso encosta no jogador na tela
+
+/**
+ * Posição do rival na tela.
+ *
+ * A distância física é mapeada num deslocamento que ULTRAPASSA a borda: assim
+ * quem se afasta sai de quadro sozinho, em vez de ficar preso na lateral. O
+ * mesmo caminho serve para quem some do servidor — o alvo vai para fora e ele
+ * sai correndo.
+ */
+export const MP_VISIBLE_M = 300;       // acima disso o rival já saiu de quadro
+export const MP_MIN_OFFSET = 24;       // px — nunca encosta no herói
+export const MP_SPAN_PX = 130;         // px — alcance do mapeamento de distância
+export const MP_GLIDE = 3.2;           // suavização do deslize (1/s)
+export const MP_EXIT_PX = 120;         // alvo extra para quem saiu do servidor

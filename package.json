@@ -5,7 +5,7 @@
   "description": "Endless runner retro Game Boy movido por corrida real. Salve o gato!",
   "type": "module",
   "scripts": {
-    "test": "node tools/test-tracker.mjs && node tools/test-course.mjs && node tools/test-ghost.mjs && node tools/test-server.mjs",
+    "test": "node tools/test-tracker.mjs && node tools/test-course.mjs && node tools/test-server.mjs && node tools/test-rivals.mjs",
     "mp": "node server/node.mjs",
     "serve": "node tools/serve.mjs",
     "assets:gen": "node tools/gen-assets.mjs",

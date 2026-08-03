@@ -3,11 +3,10 @@
 Endless runner 2D com visual de Game Boy, instalável no celular, em que o
 personagem só avança quando **você se move de verdade no mundo real**.
 
-Você escolhe uma meta (por exemplo 6 km) e um ritmo. O jogo gera um percurso
-equivalente a essa distância e começa a contar o tempo. Aí é só guardar o
-celular no bolso e correr. No fim do trajeto há um gato parado na rua e um
-caminhão vindo — se você completar a distância dentro do tempo, chega a tempo
-de salvá-lo.
+Você escolhe uma meta (por exemplo 6 km), guarda o celular no bolso e corre. O
+jogo gera um percurso equivalente a essa distância, o herói avança junto com
+você e junta moedas pelo caminho. Não há tempo limite nem derrota: o objetivo
+é completar a distância e fazer a maior colheita possível.
 
 Todos os gráficos e animações foram gerados pelo **MCP do PixelLab**.
 
@@ -15,20 +14,27 @@ Todos os gráficos e animações foram gerados pelo **MCP do PixelLab**.
 
 ## Como jogar
 
+O menu é dividido em etapas curtas, uma decisão por tela:
+
 1. **START** na tela de título.
-2. Escolha **META** (1 a 42,2 km), **RITMO** (min/km, define o tempo limite) e
-   **MODO** de rastreio. Setas ← → mudam o valor, ↑ ↓ mudam de linha.
-3. **START** de novo. O jogo espera o sinal e a corrida começa.
-4. Guarde o celular no bolso e corra.
-5. No fim, veja se o gato foi salvo.
+2. **MODO DE JOGO** — solo ou multijogador.
+3. **ESCOLHA A META** — de 1 a 42,2 km. A coluna da direita é só uma
+   estimativa de duração a um trote de 8 min/km.
+4. **OUTRAS OPÇÕES** — rastreio e som, ambos com padrão. **START** começa de
+   qualquer linha.
+5. Guarde o celular no bolso e corra.
+
+**B** volta uma etapa em qualquer tela.
 
 ### Modos de rastreio
 
-| Modo | Quando usar | Como mede |
+Quem move o herói é sempre o **acelerômetro**. O GPS só mede.
+
+| Modo | Quando usar | O que faz |
 |---|---|---|
-| **GPS** | Ao ar livre | `watchPosition` + fórmula de haversine entre fixes |
-| **PASSOS** | Esteira, indoor | Picos do acelerômetro × comprimento da passada |
-| **DEMO** | Testar sem correr | Velocidade simulada (3 m/s); **A** dá um empurrão |
+| **PASSOS+GPS** | Ao ar livre | Passos movem; GPS afere a distância e calibra a passada |
+| **SÓ PASSOS** | Esteira, sem sinal | Passos movem; não liga o GPS |
+| **DEMO** | Testar sem correr | Gera passos simulados; **A** dá um empurrão |
 
 ### Durante a corrida
 
@@ -36,8 +42,7 @@ Como a tela não é olhada, o retorno é **sonoro e tátil**:
 
 - a cada quilômetro completado: dois bipes agudos + vibração dupla;
 - na metade da meta: um trio de bipes;
-- faltando 2 minutos: bipes graves + vibração longa;
-- no fim: jingle de vitória ou de derrota.
+- ao completar: jingle de chegada.
 
 A tela entra em **modo bolso** (quase apagada, mostrando só distância e tempo
 em tom escuro) depois de 20 s sem toque, ou na hora com **SELECT**. Um toque
@@ -123,7 +128,8 @@ js/
   audio.js              bipes de onda quadrada + vibração
   tracker.js            distância real (GPS / passos / simulador)
   course.js             geração procedural do percurso a partir da meta
-  storage.js            moedas, gatos salvos e histórico
+  storage.js            moedas, corridas completas e histórico
+  multiplayer.js        cliente de presença e posição dos rivais na tela
   game.js               máquina de estados e telas
   main.js               entrada, input, loop, instalação
 assets/
@@ -159,8 +165,10 @@ npm test
 ```
 
 Cobre a lógica que não dá para verificar no navegador sem sair correndo:
-acumulação de distância, filtros de GPS (precisão ruim, jitter parado,
-salto impossível), contagem de passos, e o determinismo da geração do percurso.
+contagem de passos e calibração da passada, filtros de GPS (precisão ruim,
+jitter parado, salto impossível), determinismo da geração do percurso, a
+privacidade do servidor de multijogador, e a entrada e saída de tela dos
+rivais.
 
 ---
 
@@ -257,7 +265,7 @@ guardado para o final.
 
 **Escala do mundo.** 24 pixels por metro real. A 3 m/s isso dá um scroll
 agradável (uma tela a cada ~2,2 s), mas comprime a distância: uma tela mostra
-só 6,7 m de mundo. Por isso a reta final tem 12 m e a chegada do gato é
+só 6,7 m de mundo. Por isso a zona de chegada tem 12 m e a entrada do gato é
 encenada em coordenadas de tela — senão ele só apareceria nos últimos 5 metros.
 
 **Percurso determinístico.** A mesma meta gera sempre o mesmo trajeto (PRNG
@@ -318,10 +326,17 @@ custava 11.520 chamadas de `fillRect` na tela de pausa: **7,2 ms por frame**,
 43% do orçamento de 60fps num desktop e o suficiente para travar num celular.
 Pré-renderizado como padrão de 2×2, virou uma única chamada — 0,20 ms.
 
-**O caminhão como relógio.** Na reta final a posição do caminhão reflete o
-tempo restante: com folga ele nem aparece; faltando pouco, vem em cima do
-gato. Ele para antes de cobrir o gato — quem está em risco precisa continuar
-visível.
+**Sem tempo limite nem derrota.** O objetivo é correr a distância e juntar
+moedas, então o cronômetro conta para cima e serve de registro. Isso também
+tirou a escolha de ritmo e de dificuldade do menu: eram formas de ajustar um
+limite que deixou de existir. O gato ficou como mascote — espera na chegada e
+comemora junto.
+
+**Rival some andando, não no ar.** A distância física do outro jogador é
+mapeada num deslocamento que ULTRAPASSA a borda da tela de propósito: quem se
+afasta sai de quadro sozinho, em vez de ficar preso na lateral. Quem some do
+servidor recebe um alvo fora da tela e sai correndo. Entre as respostas do
+servidor (a cada 4 s) a posição desliza, então ele nunca teleporta.
 
 ---
 

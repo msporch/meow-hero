@@ -45,44 +45,23 @@ export async function loadAssets(base = 'assets/') {
   }
 
   await Promise.all(jobs);
-  buildGhost();
+  buildRival();
   A.loaded = true;
   return A;
 }
 
 /**
- * Gera a versão "fantasma" do herói: o mesmo sprite com metade dos pixels
- * vazados em xadrez.
+ * Gera a silhueta usada para os outros jogadores: o mesmo sprite do herói
+ * chapado no tom mais escuro.
  *
- * Com só 4 cores não dá para usar transparência real, e um segundo corredor
- * sólido seria confundido com o jogador. O meio-tom é como os jogos de Game
- * Boy representavam algo etéreo — e sai de graça do sprite que já existe.
+ * Com só 4 cores não há transparência real, e um segundo corredor em tons
+ * cheios seria confundido com o jogador. A silhueta lê como "outra pessoa" e
+ * sai de graça do sprite que já existe.
  */
-function buildGhost() {
+function buildRival() {
   const src = A.anims.hero_run;
   if (!src) return;
 
-  const cv = document.createElement('canvas');
-  cv.width = src.img.width;
-  cv.height = src.img.height;
-  const g = cv.getContext('2d');
-  g.imageSmoothingEnabled = false;
-  g.drawImage(src.img, 0, 0);
-
-  // Vaza um pixel a cada dois, em xadrez.
-  const px = g.getImageData(0, 0, cv.width, cv.height);
-  for (let y = 0; y < cv.height; y++) {
-    for (let x = 0; x < cv.width; x++) {
-      if ((x + y) & 1) px.data[(y * cv.width + x) * 4 + 3] = 0;
-    }
-  }
-  g.putImageData(px, 0, 0);
-
-  A.anims.ghost_run = { img: cv, fw: src.fw, fh: src.fh, frames: src.frames,
-    anchorX: src.anchorX, anchorY: src.anchorY };
-
-  // Outro jogador: silhueta chapada no tom mais escuro. Precisa ser distinta
-  // tanto do jogador (tons cheios) quanto do fantasma (meio-tom).
   const rv = document.createElement('canvas');
   rv.width = src.img.width; rv.height = src.img.height;
   const rg = rv.getContext('2d');

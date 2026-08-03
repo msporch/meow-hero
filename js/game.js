@@ -2,28 +2,31 @@
 //
 // Desenho do jogo: a corrida é PASSIVA. O celular fica no bolso e o herói só
 // avança quando o usuário se move de verdade. Não há obstáculos nem toque
-// durante a corrida — o retorno vem por som e vibração, e o desfecho fica
-// guardado para o final.
+// durante a corrida — o retorno vem por som e vibração.
+//
+// O objetivo é correr a distância escolhida e juntar moedas. Não há tempo
+// limite nem derrota: o cronômetro conta para cima e serve de registro.
 import {
-  W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOALS, PACES,
-  CHUNK_PX, MILK_SECONDS, CUE_HALFWAY, CUE_LOW_TIME_S,
+  W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOALS,
+  CHUNK_PX, MILK_COINS, CUE_HALFWAY,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
-  GHOST_TRACE_S, GHOST_TRACE_MAX, GHOST_PX_PER_M, GHOST_MAX_OFFSET,
-  MP_MAX_ON_SCREEN, MP_NEAR_M,
+  MP_MAX_ON_SCREEN,
 } from './config.js';
 import { ctx, clear, rect, rectOutline, panel, dither, progressBar } from './gfx.js';
 import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js';
 import { A, drawSprite, drawAnim, drawGround, spriteSize } from './assets.js';
 import { Course } from './course.js';
 import { Tracker, MODES, formatTime, formatKmh } from './tracker.js';
-import { sfx, resumeAudio, vibrate } from './audio.js';
+import { sfx, resumeAudio, vibrate, setAudioEnabled } from './audio.js';
 import * as store from './storage.js';
 import { Multiplayer } from './multiplayer.js';
 
 const S = {
-  TITLE: 'title', SETUP: 'setup', ARM: 'arm', RUN: 'run',
+  TITLE: 'title', ARM: 'arm', RUN: 'run',
   PAUSE: 'pause', FINALE: 'finale', RESULT: 'result', HISTORY: 'history',
   CONSENT: 'consent',
+  // Menu em subseções: modo → meta → opções → correr.
+  MODO: 'modo', META: 'meta', OPCOES: 'opcoes',
 };
 
 export class Game {
@@ -37,33 +40,24 @@ export class Game {
 
     const d = store.load();
     this.goalKm = d.lastGoal ?? 5;
-    this.paceMinKm = d.lastPace ?? 8;
     this.mode = MODES.some(m => m.id === d.lastMode) ? d.lastMode : 'steps+gps';
-    this.setupRow = 0;
+    this.online = false;        // escolhido na primeira subseção do menu
+    this.row = 0;               // linha selecionada na subseção atual
 
     this.coins = 0;
-    this.timeLeft = 0;
     this.elapsed = 0;
 
     // Distância usada só para desenhar — ver _updateShownDistance.
     this.shownM = 0;
     this._lastCoinSfx = 0;
 
-    // Fantasma: sua melhor corrida naquela meta, correndo junto.
-    this.ghost = null;
-    this.ghostOn = store.get('ghostOn') !== false;
-    this.ghostDeltaM = 0;
-    this._trace = [];
-    this._traceAt = 0;
-
     // Multijogador: desligado até haver consentimento explícito.
     this.mp = new Multiplayer();
-    this.mpOn = store.get('mpConsent') === true && this.mp.configured;
+    this.mpOn = false;
     this.kmCued = 0;
     this.halfCued = false;
-    this.lowTimeCued = false;
 
-    this.saved = false;
+    this.chegou = false;
     this.finaleT = 0;
     this.finalePhase = 0;
 
@@ -157,14 +151,16 @@ export class Game {
       // Números em tom escuro: dá pra conferir de relance sem acordar a tela,
       // e continua economizando bateria em telas OLED.
       drawText(ctx, `${(this.tracker.distanceM / 1000).toFixed(2)} KM`, W / 2, 56, 1, 'center');
-      drawText(ctx, formatTime(this.timeLeft), W / 2, 70, 1, 'center');
+      drawText(ctx, formatTime(this.elapsed), W / 2, 70, 1, 'center');
       drawText(ctx, 'TOQUE PARA VER', W / 2, 92, 1, 'center');
       return;
     }
 
     switch (this.state) {
       case S.TITLE: this._drawTitle(); break;
-      case S.SETUP: this._drawSetup(); break;
+      case S.MODO: this._drawModo(); break;
+      case S.META: this._drawMeta(); break;
+      case S.OPCOES: this._drawOpcoes(); break;
       case S.CONSENT: this._drawConsent(); break;
       case S.ARM: this._drawArm(); break;
       case S.RUN: this._drawRun(); break;
@@ -190,7 +186,9 @@ export class Game {
 
     switch (this.state) {
       case S.TITLE: return this._inputTitle(key);
-      case S.SETUP: return this._inputSetup(key);
+      case S.MODO: return this._inputModo(key);
+      case S.META: return this._inputMeta(key);
+      case S.OPCOES: return this._inputOpcoes(key);
       case S.CONSENT: return this._inputConsent(key);
       case S.ARM: return this._inputArm(key);
       case S.RUN: return this._inputRun(key);
@@ -204,7 +202,7 @@ export class Game {
   // ---------------- TÍTULO ----------------
 
   _inputTitle(key) {
-    if (key === 'start' || key === 'a' || key === 'tap') { sfx.confirm(); this.go(S.SETUP); }
+    if (key === 'start' || key === 'a' || key === 'tap') { sfx.confirm(); this.row = 0; this.go(S.MODO); }
     else if (key === 'select') { sfx.select(); this.menuIndex = 0; this.go(S.HISTORY); }
   }
 
@@ -217,110 +215,210 @@ export class Game {
     dither(0, 8, W, 34, 0, 0);
     rect(0, 14, W, 22, 0);
     drawText(ctx, 'MEOW HERO', W / 2, 18, 3, 'center');
-    drawText(ctx, 'CORRA. SALVE O GATO.', W / 2, 27, 2, 'center');
+    drawText(ctx, 'CORRA. PEGUE AS MOEDAS.', W / 2, 27, 2, 'center');
 
     const d = store.load();
     rect(0, H - 26, W, 26, 0);
     if (Math.floor(this.t * 1.6) % 2 === 0) {
       drawText(ctx, 'START PARA COMECAR', W / 2, H - 22, 3, 'center');
     }
-    drawText(ctx, `\x05${d.coins}  \x04${d.catsSaved}  ${d.totalKm.toFixed(1)}KM`, W / 2, H - 11, 2, 'center');
+    drawText(ctx, `\x05${d.coins}   ${d.totalKm.toFixed(1)}KM   \x04${d.completadas}`, W / 2, H - 11, 2, 'center');
   }
 
   // ---------------- CONFIGURAÇÃO ----------------
 
-  _inputSetup(key) {
-    const rows = 5;
-    if (key === 'up') { this.setupRow = (this.setupRow + rows - 1) % rows; sfx.select(); }
-    else if (key === 'down') { this.setupRow = (this.setupRow + 1) % rows; sfx.select(); }
+  // ---------------- MENU: navegação comum ----------------
+
+  /**
+   * Uma subseção do menu é só uma lista de itens. Cada item tem um rótulo,
+   * um valor opcional (para linhas que alternam com ← →) e uma dica.
+   * Centralizar aqui evita repetir seleção, desenho e navegação em cada tela.
+   */
+  _menuNav(itens, key, { onEscolher, onVoltar, onAlternar }) {
+    const n = itens.length;
+    if (key === 'up') { this.row = (this.row + n - 1) % n; sfx.select(); }
+    else if (key === 'down') { this.row = (this.row + 1) % n; sfx.select(); }
     else if (key === 'left' || key === 'right') {
-      const dir = key === 'right' ? 1 : -1;
-      if (this.setupRow === 0) {
-        const i = GOALS.indexOf(this.goalKm);
-        this.goalKm = GOALS[(i + dir + GOALS.length) % GOALS.length];
-      } else if (this.setupRow === 1) {
-        const i = PACES.indexOf(this.paceMinKm);
-        this.paceMinKm = PACES[(i + dir + PACES.length) % PACES.length];
-      } else if (this.setupRow === 2) {
-        const i = MODES.findIndex(m => m.id === this.mode);
-        this.mode = MODES[(i + dir + MODES.length) % MODES.length].id;
-      } else if (this.setupRow === 3) {
-        this.ghostOn = !this.ghostOn;
-        store.set('ghostOn', this.ghostOn);
-      } else {
-        // Ligar o multijogador passa pela tela de consentimento primeiro:
-        // ele envia a sua posição para um servidor.
-        if (!this.mp.configured) { /* sem servidor: nada a alternar */ }
-        else if (this.mpOn) { this.mpOn = false; store.set('mpConsent', false); }
-        else { this.go(S.CONSENT); return; }
-      }
-      sfx.select();
+      if (onAlternar) { onAlternar(itens[this.row], key === 'right' ? 1 : -1); sfx.select(); }
     }
-    else if (key === 'b') { sfx.back(); this.go(S.TITLE); }
-    else if (key === 'start' || key === 'a') { sfx.confirm(); this._arm(); }
+    else if (key === 'b') { sfx.back(); onVoltar?.(); }
+    else if (key === 'a' || key === 'start' || key === 'tap') {
+      sfx.confirm(); onEscolher?.(itens[this.row], key);
+    }
   }
 
-  get limitSeconds() { return this.goalKm * this.paceMinKm * 60; }
-
-  _drawSetup() {
+  _drawMenu(titulo, itens, { dica, rodape } = {}) {
     clear(3);
     rect(0, 0, W, 14, 0);
-    drawText(ctx, 'PREPARAR CORRIDA', W / 2, 4, 3, 'center');
+    drawText(ctx, titulo, W / 2, 4, 3, 'center');
 
-    const mode = MODES.find(m => m.id === this.mode);
-    const ghost = store.getGhost(this.goalKm);
-    const rows = [
-      ['META', `${this.goalKm.toFixed(this.goalKm % 1 ? 1 : 0)} KM`],
-      ['RITMO', `${this.paceMinKm}:00 /KM`],
-      ['MODO', mode.label],
-      ['FANTASMA', !ghost ? 'SEM REGISTRO' : (this.ghostOn ? 'LIGADO' : 'DESLIGADO')],
-      ['ONLINE', !this.mp.configured ? 'SEM SERVIDOR' : (this.mpOn ? 'LIGADO' : 'DESLIGADO')],
-    ];
+    const alto = itens.length <= 3 ? 20 : 14;
+    const topo = itens.length <= 3 ? 30 : 20;
 
-    rows.forEach(([label, value], i) => {
-      const y = 18 + i * 14;
-      const on = i === this.setupRow;
-      if (on) { rect(4, y - 3, W - 8, 14, 2); rectOutline(4, y - 3, W - 8, 14, 0); }
-      // Texto recuado para as setas piscantes não encostarem nele.
-      drawText(ctx, label, 14, y, 0);
-      drawText(ctx, value, W - 15, y, 0, 'right');
-      if (on && Math.floor(this.t * 3) % 2 === 0) {
+    itens.forEach((it, i) => {
+      const y = topo + i * alto;
+      const on = i === this.row;
+      if (on) { rect(4, y - 3, W - 8, alto - 3, 2); rectOutline(4, y - 3, W - 8, alto - 3, 0); }
+      drawText(ctx, it.label, 14, y, 0);
+      if (it.value != null) drawText(ctx, it.value, W - 15, y, 0, 'right');
+      if (on && Math.floor(this.t * 3) % 2 === 0 && it.value != null) {
         drawText(ctx, '\x08', 7, y, 0);
         drawText(ctx, '\x03', W - 12, y, 0);
+      } else if (on && it.value == null) {
+        drawText(ctx, '\x03', 7, y, 0);
       }
     });
 
-    // Resumo: a dica acompanha a linha selecionada.
-    let dica = mode.hint;
-    if (this.setupRow === 3) {
-      dica = ghost
-        ? `Seu recorde: ${(ghost.distanceM / 1000).toFixed(2)} km em ${formatTime(ghost.seconds)}.`
-        : 'Termine uma corrida nesta meta para criar seu fantasma.';
-    } else if (this.setupRow === 4) {
-      dica = !this.mp.configured
-        ? 'Abra o link com ?mp=endereco do servidor para ativar.'
-        : 'Mostra quem esta correndo perto de voce.';
+    rect(0, 96, W, 30, 0);
+    wrapText(dica || '', W - 12).slice(0, 3).forEach((l, i) =>
+      drawText(ctx, l, W / 2, 99 + i * LINE_H, 2, 'center'));
+
+    drawText(ctx, rodape || 'A ESCOLHE   B VOLTA', W / 2, 132, 0, 'center');
+  }
+
+  // ---------------- MENU 1: modo de jogo ----------------
+
+  _itensModo() {
+    return [
+      { id: 'solo', label: 'SOLO' },
+      { id: 'online', label: 'MULTIJOGADOR' },
+    ];
+  }
+
+  _inputModo(key) {
+    this._menuNav(this._itensModo(), key, {
+      onVoltar: () => this.go(S.TITLE),
+      onEscolher: it => {
+        if (it.id === 'online') {
+          if (!this.mp.configured) { this.say('SEM SERVIDOR', 2.5); return; }
+          this.online = true;
+          // Envia a sua posição: precisa de consentimento antes.
+          if (store.get('mpConsent') !== true) { this.row = 0; this.go(S.CONSENT); return; }
+        } else {
+          this.online = false;
+        }
+        this.row = Math.max(0, GOALS.indexOf(this.goalKm));
+        this.go(S.META);
+      },
+    });
+  }
+
+  _drawModo() {
+    const itens = this._itensModo();
+    const dica = this.row === 0
+      ? 'Voce contra o relogio.'
+      : (this.mp.configured
+        ? 'Mostra quem esta correndo perto de voce.'
+        : 'Sem servidor. Abra o link com ?mp=endereco.');
+    this._drawMenu('MODO DE JOGO', itens, { dica });
+  }
+
+  // ---------------- MENU 2: meta ----------------
+
+  _inputMeta(key) {
+    const itens = GOALS.map(km => ({ km, label: `${km.toFixed(km % 1 ? 1 : 0)} KM` }));
+    // A lista é longa: rola em vez de mostrar tudo.
+    const n = itens.length;
+    if (key === 'up') { this.row = (this.row + n - 1) % n; sfx.select(); }
+    else if (key === 'down') { this.row = (this.row + 1) % n; sfx.select(); }
+    else if (key === 'b') { this.row = this.online ? 1 : 0; sfx.back(); this.go(S.MODO); }
+    else if (key === 'a' || key === 'start' || key === 'tap') {
+      this.goalKm = itens[this.row].km;
+      store.set('lastGoal', this.goalKm);
+      sfx.confirm();
+      this.row = 0;
+      this.go(S.OPCOES);
+    }
+  }
+
+  _drawMeta() {
+    clear(3);
+    rect(0, 0, W, 14, 0);
+    drawText(ctx, 'ESCOLHA A META', W / 2, 4, 3, 'center');
+
+    // Janela de 6 itens centrada na seleção.
+    const VIS = 6;
+    const n = GOALS.length;
+    let ini = Math.min(Math.max(0, this.row - 2), Math.max(0, n - VIS));
+
+    for (let i = 0; i < Math.min(VIS, n); i++) {
+      const idx = ini + i;
+      const km = GOALS[idx];
+      const y = 20 + i * 13;
+      const on = idx === this.row;
+      if (on) { rect(4, y - 3, W - 8, 13, 2); rectOutline(4, y - 3, W - 8, 13, 0); }
+      drawText(ctx, `${km.toFixed(km % 1 ? 1 : 0)} KM`, 16, y, 0);
+      // Estimativa a um trote de 8 min/km, só para dar noção de duração.
+      // Sem "~": a fonte 5x7 não tem esse caractere e ele sairia como "?".
+      drawText(ctx, formatTime(km * 8 * 60), W - 14, y, 1, 'right');
+      if (on) drawText(ctx, '\x03', 8, y, 0);
     }
 
-    rect(0, 90, W, 32, 0);
-    drawText(ctx, `TEMPO LIMITE ${formatTime(this.limitSeconds)}`, W / 2, 93, 3, 'center');
-    wrapText(dica, W - 12).slice(0, 2).forEach((l, i) =>
-      drawText(ctx, l, W / 2, 104 + i * LINE_H, 2, 'center'));
+    // Marcadores de rolagem na borda direita, fora da coluna de texto.
+    if (ini > 0) drawText(ctx, '\x02', W - 7, 20, 1);
+    if (ini + VIS < n) drawText(ctx, '\x02', W - 7, 20 + (Math.min(VIS, n) - 1) * 13, 1);
 
-    drawText(ctx, 'START COMECA   B VOLTA', W / 2, 130, 0, 'center');
+    rect(0, 104, W, 22, 0);
+    drawText(ctx, 'A DIREITA E UMA ESTIMATIVA', W / 2, 107, 2, 'center');
+    drawText(ctx, 'DE DURACAO. NAO HA LIMITE.', W / 2, 116, 2, 'center');
+    drawText(ctx, 'A ESCOLHE   B VOLTA', W / 2, 132, 0, 'center');
+  }
+
+  // ---------------- MENU 3: outras opções ----------------
+
+  _itensOpcoes() {
+    const mode = MODES.find(m => m.id === this.mode) ?? MODES[0];
+    return [
+      { id: 'rastreio', label: 'RASTREIO', value: mode.label, hint: mode.hint },
+      { id: 'som', label: 'SOM', value: store.get('audio') === false ? 'DESLIGADO' : 'LIGADO',
+        hint: 'Avisos por bipe a cada quilometro.' },
+      { id: 'comecar', label: 'COMECAR', hint: 'Bora correr.' },
+    ];
+  }
+
+  _inputOpcoes(key) {
+    const itens = this._itensOpcoes();
+    this._menuNav(itens, key, {
+      onVoltar: () => { this.row = Math.max(0, GOALS.indexOf(this.goalKm)); this.go(S.META); },
+      onAlternar: (it, dir) => {
+        if (it.id === 'rastreio') {
+          const i = MODES.findIndex(m => m.id === this.mode);
+          this.mode = MODES[(i + dir + MODES.length) % MODES.length].id;
+          store.set('lastMode', this.mode);
+        } else if (it.id === 'som') {
+          const novo = store.get('audio') === false;
+          store.set('audio', novo);
+          setAudioEnabled(novo);
+        }
+      },
+      // START começa de qualquer linha; A só começa em cima de COMECAR.
+      onEscolher: (it, k) => { if (it.id === 'comecar' || k === 'start') this._arm(); },
+    });
+  }
+
+  _drawOpcoes() {
+    const itens = this._itensOpcoes();
+    this._drawMenu('OUTRAS OPCOES', itens, {
+      dica: itens[this.row]?.hint,
+      rodape: 'START COMECA   B VOLTA',
+    });
   }
 
   // ---------------- CONSENTIMENTO DO MULTIJOGADOR ----------------
 
   _inputConsent(key) {
     if (key === 'a' || key === 'start') {
-      this.mpOn = true;
       store.set('mpConsent', true);
+      this.online = true;
       sfx.confirm();
-      this.go(S.SETUP);
+      this.row = Math.max(0, GOALS.indexOf(this.goalKm));
+      this.go(S.META);
     } else if (key === 'b' || key === 'select') {
+      // Recusar volta ao modo, com SOLO selecionado.
+      this.online = false;
       sfx.back();
-      this.go(S.SETUP);
+      this.row = 0;
+      this.go(S.MODO);
     }
   }
 
@@ -354,29 +452,24 @@ export class Game {
 
   async _arm() {
     store.set('lastGoal', this.goalKm);
-    store.set('lastPace', this.paceMinKm);
     store.set('lastMode', this.mode);
 
     this.course = new Course(this.goalKm, Math.round(this.goalKm * 977) % 100000);
     this.coins = 0;
     this.elapsed = 0;
-    this.timeLeft = this.limitSeconds;
     this.kmCued = 0;
     this.halfCued = false;
-    this.lowTimeCued = false;
-    this.saved = false;
+    this.chegou = false;
     this._collectedTo = 0;
     this.shownM = 0;
     this._lastCoinSfx = 0;
-    this._trace = [0];
-    this._traceAt = 0;
-    this.ghost = this.ghostOn ? store.getGhost(this.goalKm) : null;
-    this.ghostDeltaM = 0;
     this.tracker.reset();
     this.tracker.stride = store.get('stride') || 0.78;
 
     // O online só faz sentido com GPS: é a posição que localiza os vizinhos.
-    if (this.mpOn && this.mode === 'steps+gps') this.mp.start(); else this.mp.stop();
+    this.mpOn = this.online && this.mp.configured
+      && store.get('mpConsent') === true && this.mode === 'steps+gps';
+    if (this.mpOn) this.mp.start(); else this.mp.stop();
 
     this.go(S.ARM);
     await this.tracker.start(this.mode);
@@ -411,7 +504,7 @@ export class Game {
   }
 
   _inputArm(key) {
-    if (key === 'b') { sfx.back(); this.tracker.stop(); this._releaseWakeLock(); this.go(S.SETUP); }
+    if (key === 'b') { sfx.back(); this.tracker.stop(); this._releaseWakeLock(); this.go(S.OPCOES); }
     // Deixa forçar o início mesmo sem sinal ideal.
     else if (key === 'start' && this.t > 1.5) this._begin();
   }
@@ -465,7 +558,6 @@ export class Game {
   _updateRun(dt) {
     const tr = this.tracker;
     this.elapsed += dt;
-    this.timeLeft -= dt;
 
     // Entra em modo bolso após um tempo sem toque — é o uso previsto.
     // Com o diagnóstico aberto não apaga: a tela existe para ser observada.
@@ -483,33 +575,12 @@ export class Game {
       this.halfCued = true;
       sfx.halfway();
     }
-    if (!this.lowTimeCued && this.timeLeft <= CUE_LOW_TIME_S && this.timeLeft > 0) {
-      this.lowTimeCued = true;
-      sfx.lowTime();
-    }
-
     // Coleta pela posição desenhada, para a moeda sumir quando o herói passa
     // por ela na tela. O que ficar para trás é recolhido ao fim da corrida.
-    // Traçado da corrida: distância a cada GHOST_TRACE_S, para virar o
-    // fantasma da próxima vez. O teto evita que uma maratona encha o
-    // localStorage — passado ele, amostra mais espaçado.
-    if (this.elapsed - this._traceAt >= GHOST_TRACE_S) {
-      this._traceAt = this.elapsed;
-      if (this._trace.length < GHOST_TRACE_MAX) this._trace.push(dist);
-    }
-
-    // Diferença para o fantasma: positiva = ele na frente.
-    if (this.ghost) {
-      const dg = store.ghostDistanceAt(this.ghost, this.elapsed);
-      this.ghostDeltaM = dg == null ? 0 : dg - dist;
-    }
-
     // Multijogador: envia posição e recolhe quem está perto.
-    if (this.mpOn) {
-      this.mp.tick(performance.now(), {
-        position: tr.position, runM: dist, goalKm: this.goalKm,
-      });
-    }
+    this.mp.tick(performance.now(), dt, {
+      position: tr.position, runM: dist, goalKm: this.goalKm,
+    });
 
     const got = this._collectUpTo(this.shownM);
 
@@ -521,28 +592,20 @@ export class Game {
     }
     if (got.milk > 0) {
       if (!this.pocket) sfx.milk();
-      this.say(`+${MILK_SECONDS * got.milk}s`, 1.6);
+      this.say(`+${MILK_COINS * got.milk} `, 1.6);
     }
 
-    // Chegou na meta.
+    // Chegou na meta. Não existe o caminho contrário: sem tempo limite, a
+    // corrida só termina quando você completa ou desiste.
     if (dist >= this.course.goalM) {
-      this.saved = this.timeLeft > 0;
-      this._enterFinale();
-      return;
-    }
-
-    // Tempo esgotado.
-    if (this.timeLeft <= 0) {
-      this.timeLeft = 0;
-      this.saved = false;
+      this.chegou = true;
       this._enterFinale();
     }
   }
 
-  /** Vizinhos desenhados na cena, os mais próximos primeiro. */
+  /** Vizinhos dentro da tela, os mais próximos primeiro. */
   get mpVisiveis() {
-    if (!this.mpOn) return [];
-    return this.mp.players.slice(0, MP_MAX_ON_SCREEN);
+    return this.mp.rivals.visible(MP_MAX_ON_SCREEN);
   }
 
   _enterFinale() {
@@ -575,7 +638,7 @@ export class Game {
         if (it.x > worldX || this.course.isTaken(it.id)) continue;
         this.course.take(it.id);
         if (it.type === 'coin') { this.coins++; coins++; }
-        else if (it.type === 'milk') { this.timeLeft += MILK_SECONDS; milk++; }
+        else if (it.type === 'milk') { this.coins += MILK_COINS; milk++; }
       }
     }
     this._collectedTo = to;
@@ -599,11 +662,10 @@ export class Game {
     this.tracker.stop();
     this.mp.stop();
     this._releaseWakeLock();
-    this.saved = false;
+    this.chegou = false;
     store.recordRun({
       goalKm: this.goalKm, distanceM: this.tracker.distanceM,
-      seconds: this.elapsed, coins: this.coins, saved: false, mode: this.mode,
-      trace: this._trace,
+      seconds: this.elapsed, coins: this.coins, completou: false, mode: this.mode,
     });
     this.go(S.RESULT);
   }
@@ -628,7 +690,7 @@ export class Game {
     return from + (to - from) * t;
   }
 
-  _drawWorld(worldX, { heroAnim = 'hero_run', heroFrame = 0, heroY = GROUND_Y, catX = null, truckX = null } = {}) {
+  _drawWorld(worldX, { heroAnim = 'hero_run', heroFrame = 0, heroY = GROUND_Y, catX = null } = {}) {
     clear(3);
 
     // Céu
@@ -673,42 +735,16 @@ export class Game {
       }
     }
 
-    // Gato e caminhão (reta final)
-    if (catX != null) {
-      drawAnim('cat_sit', Math.floor(this.frame / 8), catX, GROUND_Y);
-    }
-    if (truckX != null) {
-      drawSprite('truck', truckX, GROUND_Y - 1, { flip: true });
-    }
+    // Gato esperando na chegada.
+    if (catX != null) drawAnim('cat_sit', Math.floor(this.frame / 8), catX, GROUND_Y);
 
-    // Fantasma: sua melhor corrida nesta meta, correndo junto.
-    //
-    // A posição é a diferença de distância, comprimida: 1 m real vale 24 px de
-    // mundo, então 3 m de vantagem já o tirariam de quadro. Aqui cada metro
-    // vale poucos pixels e ele encosta na borda quando a diferença é grande.
-    if (this.ghost && Math.abs(this.ghostDeltaM) > 0.5) {
-      const off = Math.max(-GHOST_MAX_OFFSET, Math.min(GHOST_MAX_OFFSET,
-        this.ghostDeltaM * GHOST_PX_PER_M));
-      const gx = HERO_X + off;
-      drawAnim('ghost_run', heroFrame, gx, GROUND_Y);
-
-      const rotulo = `${this.ghostDeltaM > 0 ? '+' : ''}${Math.round(this.ghostDeltaM)}M`;
-      drawTextShadow(ctx, rotulo, gx, GROUND_Y - 50, 0, 3, 'center');
-    }
-
-    // Outros jogadores correndo por perto. A posição na tela vem de quão perto
-    // estão de você fisicamente; o lado, de quem está à frente na corrida.
-    //
-    // O afastamento mínimo e o empurrão por índice existem porque vários
-    // vizinhos a distâncias parecidas cairiam uns por cima dos outros — e por
-    // cima do herói, quando a distância é quase zero. Os rótulos sobem em
-    // degraus pelo mesmo motivo.
-    this.mpVisiveis.forEach((p, i) => {
-      const longe = Math.min(1, p.distM / MP_NEAR_M);
-      const lado = p.aheadM >= 0 ? 1 : -1;
-      const px = HERO_X + lado * (24 + longe * 40 + i * 7);
-      drawAnim('rival_run', heroFrame + (p.id.charCodeAt(0) % 8), px, GROUND_Y);
-      drawTextShadow(ctx, `${p.distM}M`, px, GROUND_Y - 52 - i * 9, 0, 3, 'center');
+    // Outros jogadores correndo por perto. A posição de cada um é mantida pelo
+    // RivalSet, que desliza suavemente entre as respostas do servidor (que vêm
+    // a cada 4 s) e leva para fora de quadro quem se afasta ou some.
+    // Os rótulos sobem em degraus para não colidirem entre si.
+    this.mpVisiveis.forEach((r, i) => {
+      drawAnim('rival_run', heroFrame + (r.id.charCodeAt(0) % 8), r.x, GROUND_Y);
+      drawTextShadow(ctx, `${r.distM}M`, r.x, GROUND_Y - 52 - i * 9, 0, 3, 'center');
     });
 
     // Herói
@@ -736,21 +772,11 @@ export class Game {
     const anim = moving ? 'hero_run' : 'hero_idle';
     const frame = moving ? Math.floor(this.elapsed * cadence) : Math.floor(this.elapsed * 3);
 
+    // Na reta final o gato aparece esperando na chegada — mascote, não resgate.
     const inFinaleZone = worldX >= this.course.finaleStartPx;
     const catX = inFinaleZone ? this._catScreenX(worldX) : null;
 
-    let truckX = null;
-    if (inFinaleZone) {
-      // O caminhão se aproxima conforme o tempo aperta: com folga ele fica fora
-      // de quadro; faltando pouco, vem em cima do gato. Mas para antes de
-      // cobri-lo — o gato precisa continuar visível, é ele que está em risco.
-      const remainRatio = Math.max(0, Math.min(1, this.timeLeft / 45));
-      const wanted = W + 50 - (1 - remainRatio) * 120;
-      const halfTruck = spriteSize('truck').w / 2;
-      truckX = Math.max(catX + halfTruck + 14, wanted);
-    }
-
-    this._drawWorld(worldX, { heroAnim: anim, heroFrame: frame, catX, truckX });
+    this._drawWorld(worldX, { heroAnim: anim, heroFrame: frame, catX });
     this._drawHud();
     if (this.debug) this._drawDebug();
   }
@@ -761,7 +787,7 @@ export class Game {
 
     const km = (tr.distanceM / 1000);
     drawText(ctx, `${km.toFixed(2)}KM`, 3, 2, 3);
-    drawText(ctx, formatTime(this.timeLeft), W - 3, 2, this.timeLeft < 60 ? 2 : 3, 'right');
+    drawText(ctx, formatTime(this.elapsed), W - 3, 2, 3, 'right');
 
     // Barra de progresso com marcas de quilômetro.
     const t = Math.min(1, tr.distanceM / this.course.goalM);
@@ -822,24 +848,17 @@ export class Game {
     drawText(ctx, `${(this.tracker.distanceM / 1000).toFixed(2)} / ${this.goalKm} KM`, W / 2, 60, 0, 'center');
     drawText(ctx, `\x05 ${this.coins}`, W / 2, 70, 0, 'center');
     drawText(ctx, 'START CONTINUA', W / 2, 82, 0, 'center');
-    drawText(ctx, 'SELECT DESISTE', W / 2, 91, 1, 'center');
+    drawText(ctx, 'SELECT ENCERRA', W / 2, 91, 1, 'center');
   }
 
   // ---------------- FINAL ----------------
 
   _updateFinale(dt) {
     this.finaleT += dt;
-
-    if (this.saved) {
-      // 0: corre até o gato · 1: salto · 2: resgate · 3: comemoração
-      if (this.finaleT > 1.1 && this.finalePhase === 0) { this.finalePhase = 1; }
-      if (this.finaleT > 2.0 && this.finalePhase === 1) { this.finalePhase = 2; sfx.win(); }
-      if (this.finaleT > 3.4 && this.finalePhase === 2) { this.finalePhase = 3; }
-      if (this.finaleT > 6.0) this._finish();
-    } else {
-      if (this.finaleT > 1.4 && this.finalePhase === 0) { this.finalePhase = 1; sfx.lose(); }
-      if (this.finaleT > 4.5) this._finish();
-    }
+    // 0: chegando · 1: comemoração com o gato · 2: faixa de chegada
+    if (this.finaleT > 0.9 && this.finalePhase === 0) { this.finalePhase = 1; sfx.win(); }
+    if (this.finaleT > 2.2 && this.finalePhase === 1) { this.finalePhase = 2; }
+    if (this.finaleT > 5.0) this._finish();
   }
 
   _finish() {
@@ -848,66 +867,39 @@ export class Game {
     this._releaseWakeLock();
     store.recordRun({
       goalKm: this.goalKm, distanceM: this.tracker.distanceM,
-      seconds: this.elapsed, coins: this.coins, saved: this.saved, mode: this.mode,
-      trace: this._trace,
+      seconds: this.elapsed, coins: this.coins, completou: this.chegou, mode: this.mode,
     });
     this.go(S.RESULT);
   }
 
+  /**
+   * Chegada. Sem resgate e sem derrota: o herói completa a distância, o gato
+   * comemora junto e o total de moedas aparece.
+   */
   _drawFinale() {
     const worldX = Math.min(this.shownM, this.course.goalM) * PX_PER_M;
     const p = this.finalePhase;
 
-    if (this.saved) {
-      let heroAnim = 'hero_run', heroFrame = Math.floor(this.finaleT * 12), heroY = GROUND_Y;
+    const chegando = p === 0;
+    this._drawWorld(worldX, {
+      heroAnim: chegando ? 'hero_run' : 'hero_idle',
+      heroFrame: Math.floor(this.finaleT * (chegando ? 12 : 4)),
+      catX: chegando ? HERO_X + 52 : null,
+    });
 
-      if (p >= 1) {
-        // Salto em direção ao gato.
-        const jt = Math.min(1, (this.finaleT - 1.1) / 0.9);
-        heroAnim = 'hero_jump';
-        heroFrame = Math.floor(jt * (A.anims.hero_jump?.frames ?? 7));
-        heroY = GROUND_Y - Math.sin(jt * Math.PI) * 26;
-      }
-      if (p >= 2) { heroAnim = 'hero_idle'; heroFrame = Math.floor(this.finaleT * 4); heroY = GROUND_Y; }
+    if (p >= 1) drawAnim('cat_happy', Math.floor(this.finaleT * 8), HERO_X + 24, GROUND_Y);
 
-      this._drawWorld(worldX, {
-        heroAnim, heroFrame, heroY,
-        catX: p < 2 ? HERO_X + 52 : null,
-        truckX: p >= 1 && p < 3 ? W + 40 - (this.finaleT - 1.1) * 260 : null,
-      });
-
-      // Depois do resgate, o gato aparece feliz ao lado do herói.
-      if (p >= 2) drawAnim('cat_happy', Math.floor(this.finaleT * 8), HERO_X + 22, GROUND_Y);
-
-      if (p >= 3) {
-        rect(0, 44, W, 30, 0);
-        drawText(ctx, 'GATO SALVO!', W / 2, 50, 3, 'center');
-        drawText(ctx, `\x04 MEOW! \x04`, W / 2, 62, 2, 'center');
-      }
-    } else {
-      // Sem drama explícito: buzina, corte para o escuro e a constatação.
-      this._drawWorld(worldX, {
-        heroAnim: 'hero_idle', heroFrame: Math.floor(this.finaleT * 3),
-        catX: p < 1 ? HERO_X + 52 : null,
-        truckX: p < 1 ? W + 20 - this.finaleT * 120 : null,
-      });
-
-      if (p >= 1) {
-        const k = Math.min(1, (this.finaleT - 1.4) / 0.8);
-        if (k < 0.35) rect(0, 0, W, H, 3);
-        else { clear(0); }
-        if (k > 0.5) {
-          drawText(ctx, 'O TEMPO ACABOU', W / 2, 60, 3, 'center');
-          drawText(ctx, 'NAO DEU PRA CHEGAR', W / 2, 74, 2, 'center');
-        }
-      }
+    if (p >= 2) {
+      rect(0, 40, W, 34, 0);
+      drawText(ctx, 'META CUMPRIDA!', W / 2, 45, 3, 'center');
+      drawText(ctx, ` ${this.coins} MOEDAS`, W / 2, 58, 2, 'center');
     }
   }
 
   // ---------------- RESULTADO ----------------
 
   _inputResult(key) {
-    if (key === 'start' || key === 'a') { sfx.confirm(); this.go(S.SETUP); }
+    if (key === 'start' || key === 'a') { sfx.confirm(); this.row = 0; this.go(S.MODO); }
     else if (key === 'b') { sfx.back(); this.go(S.TITLE); }
     else if (key === 'select') { this.menuIndex = 0; this.go(S.HISTORY); }
   }
@@ -915,7 +907,7 @@ export class Game {
   _drawResult() {
     clear(3);
     rect(0, 0, W, 14, 0);
-    drawText(ctx, this.saved ? 'GATO SALVO!' : 'FIM DA CORRIDA', W / 2, 4, 3, 'center');
+    drawText(ctx, this.chegou ? 'META CUMPRIDA!' : 'CORRIDA ENCERRADA', W / 2, 4, 3, 'center');
 
     const tr = this.tracker;
     // A distância do relatório é a do GPS quando houver: ela é aferida, e a do
@@ -937,22 +929,16 @@ export class Game {
     });
 
     // O gato fica na faixa livre entre os números e a barra, sem cobrir texto.
-    const catAnim = this.saved ? 'cat_happy' : 'cat_sit';
-    drawAnim(catAnim, Math.floor(this.t * (this.saved ? 8 : 4)), W / 2, 94);
+    drawAnim(this.chegou ? 'cat_happy' : 'cat_sit',
+      Math.floor(this.t * (this.chegou ? 8 : 4)), W / 2, 94);
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
     progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);
-    drawText(ctx, `${pct}%`, 6, 107, 0);
-
-    // Como foi contra o fantasma. Delta negativo = você ficou à frente dele.
-    if (this.ghost) {
-      const d = Math.round(-this.ghostDeltaM);
-      drawText(ctx, d >= 0 ? `RECORDE +${d}M` : `RECORDE ${d}M`, W - 6, 107, 0, 'right');
-    }
+    drawText(ctx, `${pct}%`, W / 2, 107, 0, 'center');
 
     const d = store.load();
     rect(0, 116, W, H - 116, 0);
-    drawText(ctx, `TOTAL \x05${d.coins}  \x04${d.catsSaved}`, W / 2, 118, 2, 'center');
+    drawText(ctx, `TOTAL \x05${d.coins}   ${d.totalKm.toFixed(1)}KM`, W / 2, 118, 2, 'center');
     if (Math.floor(this.t * 1.6) % 2 === 0) {
       drawText(ctx, 'START CORRE DE NOVO', W / 2, 127, 3, 'center');
     }
@@ -979,7 +965,7 @@ export class Game {
         drawText(ctx, `${(r.distanceM / 1000).toFixed(1)}KM`, 40, y, 0);
         drawText(ctx, formatTime(r.seconds), 82, y, 0);
         // Carinha de gato = salvou; traço = não deu tempo.
-        drawText(ctx, r.saved ? '\x04' : '-', W - 8, y, r.saved ? 0 : 1, 'right');
+        drawText(ctx, r.completou ? '\x04' : '-', W - 8, y, r.completou ? 0 : 1, 'right');
       });
     }
     drawText(ctx, 'B VOLTA', W / 2, H - 9, 0, 'center');

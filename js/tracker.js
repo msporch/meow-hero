@@ -367,8 +367,12 @@ export function formatTime(sec) {
     : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/** Velocidade em km/h com uma casa, para o relatório final. */
+/**
+ * Velocidade em km/h com uma casa, para o relatório final.
+ * Limitada a 99,9: um valor maior seria erro de medição, e estouraria a
+ * largura da linha na tela de 160px.
+ */
 export function formatKmh(kmh) {
   if (!isFinite(kmh) || kmh <= 0) return '--';
-  return kmh.toFixed(1);
+  return Math.min(kmh, 99.9).toFixed(1);
 }
