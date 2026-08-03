@@ -2,7 +2,7 @@
 // offline (importante: durante a corrida a conexão pode cair).
 // Suba esta versão a cada mudança de código ou asset: o cache é cache-first,
 // então sem isso um app já instalado continuaria servindo os arquivos antigos.
-const VERSION = 'meowhero-v14-gba';
+const VERSION = 'meowhero-v15-gba';
 
 const SHELL = [
   './',

@@ -373,6 +373,9 @@ if (process.argv[1]?.endsWith('demake-gba.mjs')) {
   // ---------- 1. animações ----------
   const grupos = {};
   for (const f of arquivos) {
+    // `<nome>_reprovado_*` é a versão que a inspeção visual recusou; ela fica
+    // em disco para comparação, mas não pode entrar no atlas.
+    if (f.includes('_reprovado_')) continue;
     const m = f.match(/^(.+)_(\d{2})\.png$/);
     if (m) (grupos[m[1]] ??= []).push({ n: Number(m[2]), f });
   }

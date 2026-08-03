@@ -336,14 +336,6 @@
       "anchorX": 17,
       "anchorY": 57
     },
-    "fantasma_reprovado_pose": {
-      "file": "sprites/fantasma_reprovado_pose.png",
-      "fw": 20,
-      "fh": 57,
-      "frames": 1,
-      "anchorX": 10,
-      "anchorY": 57
-    },
     "fantasma_run": {
       "file": "sprites/fantasma_run.png",
       "fw": 45,
@@ -440,14 +432,6 @@
       "anchorX": 8,
       "anchorY": 58
     },
-    "neon_reprovado_pose": {
-      "file": "sprites/neon_reprovado_pose.png",
-      "fw": 16,
-      "fh": 57,
-      "frames": 1,
-      "anchorX": 8,
-      "anchorY": 57
-    },
     "neon_run": {
       "file": "sprites/neon_run.png",
       "fw": 43,
@@ -520,14 +504,6 @@
       "anchorX": 15,
       "anchorY": 65
     },
-    "pirata_reprovado_pose": {
-      "file": "sprites/pirata_reprovado_pose.png",
-      "fw": 20,
-      "fh": 60,
-      "frames": 1,
-      "anchorX": 10,
-      "anchorY": 60
-    },
     "pirata_run": {
       "file": "sprites/pirata_run.png",
       "fw": 44,
@@ -558,14 +534,6 @@
       "fh": 59,
       "frames": 1,
       "anchorX": 7,
-      "anchorY": 59
-    },
-    "robo_ouro_reprovado_pose": {
-      "file": "sprites/robo_ouro_reprovado_pose.png",
-      "fw": 11,
-      "fh": 59,
-      "frames": 1,
-      "anchorX": 6,
       "anchorY": 59
     },
     "robo_ouro_run": {
