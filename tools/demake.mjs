@@ -175,13 +175,41 @@ for (const f of files) {
  * (0, 1, 2), preservando contorno e sombreado mas garantindo que o primeiro
  * plano sempre tenha mais peso que o cenário.
  */
+const NIVEL_DE = new Map(DMG.map((c, i) => [c.join(','), i]));
+const nivelDoPixel = (d, i) => NIVEL_DE.get(`${d[i]},${d[i + 1]},${d[i + 2]}`) ?? 0;
+
 function paraPrimeiroPlano(png) {
-  const nivel = new Map(DMG.map((c, i) => [c.join(','), i]));
   for (let i = 0; i < png.data.length; i += 4) {
     if (png.data[i + 3] < ALPHA_CUT) continue;
-    const atual = nivel.get(`${png.data[i]},${png.data[i + 1]},${png.data[i + 2]}`) ?? 0;
-    const novo = Math.round(atual * 2 / 3);
+    const novo = Math.round(nivelDoPixel(png.data, i) * 2 / 3);
     const [r, g, b] = DMG[novo];
+    png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b;
+  }
+  return png;
+}
+
+/** Nível médio dos pixels opacos de um conjunto de frames (0 = escuro). */
+function nivelMedio(pngs) {
+  let soma = 0, n = 0;
+  for (const p of pngs) {
+    for (let i = 0; i < p.data.length; i += 4) {
+      if (p.data[i + 3] < ALPHA_CUT) continue;
+      soma += nivelDoPixel(p.data, i); n++;
+    }
+  }
+  return n ? soma / n : 0;
+}
+
+/**
+ * Escurece mais um degrau. Necessário para sprites brancos: o fantasma, mesmo
+ * depois do ajuste padrão, continuava quase todo no tom claro e desaparecia
+ * contra os prédios. Aplicado só quando a média ainda está clara demais, para
+ * não achatar as skins que já estavam boas.
+ */
+function escureceMais(png) {
+  for (let i = 0; i < png.data.length; i += 4) {
+    if (png.data[i + 3] < ALPHA_CUT) continue;
+    const [r, g, b] = DMG[Math.max(0, nivelDoPixel(png.data, i) - 1)];
     png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b;
   }
   return png;
@@ -191,7 +219,13 @@ for (const [name, list] of Object.entries(groups)) {
   list.sort((a, b) => a.n - b.n);
   const pngs = list.map(e => read(path.join(RAW, e.f)));
   const range = lumRange(pngs);
-  const q = pngs.map(p => paraPrimeiroPlano(quantize(p, range, { dither: false })));
+  let q = pngs.map(p => paraPrimeiroPlano(quantize(p, range, { dither: false })));
+  // Sprite ainda claro demais depois do ajuste padrão: escurece outro degrau.
+  const CLARO_DEMAIS = 1.45;
+  if (nivelMedio(q) > CLARO_DEMAIS) {
+    q = q.map(escureceMais);
+    console.log(`  · ${name}: escurecido a mais (estava claro demais para o fundo)`);
+  }
   const box = unionBBox(q);
   const framesC = q.map(p => crop(p, box));
   const out = strip(framesC);

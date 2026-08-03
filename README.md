@@ -19,7 +19,7 @@ o D-pad — é o que dá para fazer com os botões do console sem quebrar a ilus
 com um teclado do sistema por cima. Ele aparece sobre você na cena para os
 outros jogadores.
 
-Depois vem o **menu principal**: JOGAR, LOJA, NOME e HISTÓRICO.
+Depois vem o **menu principal**: JOGAR, LOJA e PERFIL.
 
 Em JOGAR o fluxo é uma decisão por tela:
 
@@ -33,21 +33,36 @@ Em JOGAR o fluxo é uma decisão por tela:
 
 **B** volta uma etapa em qualquer tela.
 
+## Perfil
+
+Reúne nome, números e os ajustes que importam num jogo de corrida — todos
+ligados de verdade:
+
+| Ajuste | Para que serve |
+|---|---|
+| **PASSADA** | Define a distância quando não há GPS. Com GPS, se autocalibra. |
+| **AVISOS KM** | Bipe e vibração a cada quilômetro. |
+| **VIBRAÇÃO** | Separada do som: com o celular no bolso, muita gente quer um sem o outro. |
+| **SOM** | Bipes do jogo. |
+| **APAGA TELA** | 10/20/60 s ou nunca. É bateria. |
+| **ZERAR TUDO** | Em dois toques, porque é irreversível. |
+
+No topo ficam moedas, quilometragem total, corridas completas e recorde.
+O histórico das corridas fica aqui dentro.
+
 ## Loja e skins
 
-Seis skins, todas geradas pelo PixelLab com **exatamente os mesmos parâmetros**
-do corredor padrão (32 px, vista lateral, *flat shading*, contorno preto) e
-passando pelo mesmo pipeline de demake — por isso trocar de skin não mexe em
-âncora nem em posicionamento.
+**21 skins**, todas geradas pelo PixelLab com **exatamente os mesmos
+parâmetros** do corredor padrão (32 px, vista lateral, *flat shading*, contorno
+preto) e passando pelo mesmo pipeline de demake — por isso trocar de skin não
+mexe em âncora nem em posicionamento.
 
-| Skin | Preço |
-|---|---|
-| Clássico | grátis |
-| Neon | 400 moedas |
-| Ninja | 1.500 moedas |
-| Robô | 4.000 moedas |
-| Astro | R$ 4,90 |
-| Esqueleto | R$ 9,90 |
+Dezessete são compradas com moedas (de grátis a 7.000), da mais barata para a
+mais cara: Clássico, Neon, Chef, Bombeiro, Pirata, Gato, Cachorro, Ninja,
+Zumbi, Panda, Mago, Alien, Cavaleiro, Robô, Vampiro, Dino e Banana.
+
+Quatro são vendidas em dinheiro: Astro (R$ 4,90), Fantasma (R$ 6,90),
+Esqueleto (R$ 9,90) e Robô de Ouro (R$ 14,90).
 
 As de moeda funcionam por completo: compram, equipam e descontam do cofrinho.
 
@@ -361,6 +376,12 @@ suave (ritmo constante); acima de 15 m de erro ela sobe, para não arrastar o
 atraso pelo resto da corrida; acima de 100 m — app suspenso por minutos no
 bolso — o cenário ressincroniza direto, já que ninguém viu aquele trecho e um
 sprint de dois minutos seria mais estranho que um corte.
+
+**Primeiro plano nunca some no fundo.** As camadas de cenário são achatadas
+nos tons claros, então um personagem claro desaparece — foi o que aconteceu
+com as skins Neon e Astro. O pipeline passou a empurrar todo personagem para a
+metade escura da paleta (4 níveis viram 3), e mede o resultado: se o sprite
+ainda ficar claro demais, como o Fantasma branco, escurece outro degrau.
 
 **Dither por padrão, não por pixel.** Desenhar o xadrez de 50% pixel a pixel
 custava 11.520 chamadas de `fillRect` na tela de pausa: **7,2 ms por frame**,
