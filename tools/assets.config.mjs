@@ -25,27 +25,6 @@ export const CHARACTERS = {
       { key: 'idle', template_animation_id: 'breathing-idle',   animation_name: 'hero_idle', directions: ['east'] },
     ],
   },
-  cat: {
-    create: {
-      description: 'small scared orange tabby kitten, big worried eyes, fluffy tail',
-      name: 'Meow Hero Cat',
-      body_type: 'quadruped',
-      template: 'cat',
-      mode: 'standard',
-      n_directions: 4,
-      // Menor que o herói, para a proporção gato/pessoa ficar crível.
-      size: 22,
-      view: 'side',
-      outline: 'single color black outline',
-      shading: 'flat shading',
-      detail: 'low detail',
-      text_guidance_scale: 9,
-    },
-    animations: [
-      { key: 'sit',   template_animation_id: 'sitting', animation_name: 'cat_sit',   directions: ['east'] },
-      { key: 'happy', template_animation_id: 'jump',    animation_name: 'cat_happy', directions: ['east'] },
-    ],
-  },
 };
 
 /**
@@ -70,11 +49,37 @@ const SKIN_ANIMS = [
   { key: 'idle', template_animation_id: 'breathing-idle',   directions: ['east'] },
 ];
 
-/** Monta a entrada de personagem de uma skin. */
+/** Monta a entrada de personagem de uma skin bípede. */
 function skin(id, description, name) {
   return {
     create: { ...SKIN_BASE, description, name },
     animations: SKIN_ANIMS.map(a => ({ ...a, animation_name: `${id}_${a.key}` })),
+  };
+}
+
+/**
+ * Skin quadrúpede (bicho de quatro patas).
+ *
+ * Difere do bípede em três pontos: usa um template de esqueleto animal, o
+ * repouso chama-se `idle` (não existe `breathing-idle` para quadrúpedes), e o
+ * tamanho pedido é maior — um bicho é baixo e comprido, então com o mesmo
+ * número do humano ele sairia miúdo demais ao lado do corredor de 42px.
+ */
+function quadrupede(id, template, description, name) {
+  return {
+    create: {
+      ...SKIN_BASE,
+      body_type: 'quadruped',
+      template,
+      size: 34,
+      proportions: undefined,     // ignorado em quadrúpede
+      description,
+      name,
+    },
+    animations: [
+      { key: 'run',  template_animation_id: 'running-8-frames', directions: ['east'], animation_name: `${id}_run` },
+      { key: 'idle', template_animation_id: 'idle',             directions: ['east'], animation_name: `${id}_idle` },
+    ],
   };
 }
 
@@ -88,8 +93,8 @@ export const SKINS = {
 
   // Lote 2 — personagens variados, de apelo mais imediato.
   mago:      skin('mago', 'wizard with pointy hat, long beard and star-covered robe', 'Skin Mago'),
-  gato:      skin('gato', 'humanoid cat with pointed ears, whiskers and long tail, standing on two legs', 'Skin Gato'),
-  cachorro:  skin('cachorro', 'humanoid dog with floppy ears and wagging tail, standing on two legs', 'Skin Cachorro'),
+  gato:      quadrupede('gato', 'cat', 'orange tabby cat with striped fur and long tail', 'Skin Gato'),
+  cachorro:  quadrupede('cachorro', 'dog', 'friendly dog with floppy ears and bushy tail', 'Skin Cachorro'),
   dino:      skin('dino', 'small green tyrannosaurus with tiny arms and big tail, standing on two legs', 'Skin Dino'),
   pirata:    skin('pirata', 'pirate with tricorn hat, eyepatch and long coat', 'Skin Pirata'),
   cavaleiro: skin('cavaleiro', 'knight in full plate armor with plumed helmet', 'Skin Cavaleiro'),

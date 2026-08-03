@@ -206,27 +206,27 @@
     },
     "cachorro_idle": {
       "file": "sprites/cachorro_idle.png",
-      "fw": 20,
-      "fh": 41,
-      "frames": 4,
-      "anchorX": 10,
-      "anchorY": 41
+      "fw": 29,
+      "fh": 23,
+      "frames": 8,
+      "anchorX": 15,
+      "anchorY": 23
     },
     "cachorro_pose": {
       "file": "sprites/cachorro_pose.png",
-      "fw": 19,
-      "fh": 41,
+      "fw": 29,
+      "fh": 22,
       "frames": 1,
-      "anchorX": 10,
-      "anchorY": 41
+      "anchorX": 15,
+      "anchorY": 22
     },
     "cachorro_run": {
       "file": "sprites/cachorro_run.png",
-      "fw": 33,
-      "fh": 39,
+      "fw": 37,
+      "fh": 21,
       "frames": 8,
-      "anchorX": 17,
-      "anchorY": 39
+      "anchorX": 19,
+      "anchorY": 21
     },
     "cavaleiro_idle": {
       "file": "sprites/cavaleiro_idle.png",
@@ -350,27 +350,27 @@
     },
     "gato_idle": {
       "file": "sprites/gato_idle.png",
-      "fw": 19,
-      "fh": 42,
-      "frames": 4,
-      "anchorX": 10,
-      "anchorY": 42
+      "fw": 32,
+      "fh": 22,
+      "frames": 8,
+      "anchorX": 16,
+      "anchorY": 22
     },
     "gato_pose": {
       "file": "sprites/gato_pose.png",
-      "fw": 18,
-      "fh": 42,
+      "fw": 30,
+      "fh": 21,
       "frames": 1,
-      "anchorX": 9,
-      "anchorY": 42
+      "anchorX": 15,
+      "anchorY": 21
     },
     "gato_run": {
       "file": "sprites/gato_run.png",
-      "fw": 34,
-      "fh": 38,
+      "fw": 37,
+      "fh": 22,
       "frames": 8,
-      "anchorX": 17,
-      "anchorY": 38
+      "anchorX": 19,
+      "anchorY": 22
     },
     "hero_idle": {
       "file": "sprites/hero_idle.png",

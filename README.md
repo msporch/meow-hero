@@ -61,6 +61,12 @@ Dezessete são compradas com moedas (de grátis a 7.000), da mais barata para a
 mais cara: Clássico, Neon, Chef, Bombeiro, Pirata, Gato, Cachorro, Ninja,
 Zumbi, Panda, Mago, Alien, Cavaleiro, Robô, Vampiro, Dino e Banana.
 
+Gato e Cachorro são **quadrúpedes de verdade**: usam os templates de esqueleto
+animal do PixelLab (`cat` e `dog`), com o repouso chamado `idle` em vez de
+`breathing-idle`, e são pedidos num tamanho maior — um bicho é baixo e
+comprido, então com o mesmo número do humano sairia miúdo demais ao lado do
+corredor.
+
 Quatro são vendidas em dinheiro: Astro (R$ 4,90), Fantasma (R$ 6,90),
 Esqueleto (R$ 9,90) e Robô de Ouro (R$ 14,90).
 
