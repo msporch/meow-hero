@@ -12,7 +12,7 @@ const EMPTY = {
   stride: 0.78,
   lastGoal: 5,
   lastPace: 8,
-  lastMode: 'gps',
+  lastMode: 'steps+gps',
 };
 
 let data = null;

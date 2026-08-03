@@ -1,10 +1,14 @@
-// Rastreamento da distância percorrida no mundo real.
-// Três fontes: GPS (padrão, ao ar livre), pedômetro por acelerômetro (indoor/esteira)
-// e um simulador para testar no desktop.
+// Rastreamento do movimento real.
+//
+// Quem move o herói é o ACELERÔMETRO: o passo é detectado em milissegundos,
+// funciona sem sinal e não espera satélite. O GPS não move nada — ele só mede
+// a distância real (para calibrar a passada e fechar o relatório) e fornece a
+// posição usada pelo modo multijogador.
 import {
   GPS_MAX_ACCURACY, GPS_MIN_DELTA, GPS_MAX_SPEED, GPS_TIMEOUT_MS, DEFAULT_STRIDE,
-  SPEED_WINDOW_MS, STOP_WINDOW_MS, SPEED_SAMPLE_MS, MOVE_ON_SPEED, MOVE_MIN_SPEED,
-  STOP_CONFIRM_MS, STEP_RECENT_MS, SPEED_DECAY_TAU,
+  STEP_RECENT_MS, STOP_CONFIRM_MS, CADENCE_SAMPLES, MOVE_MIN_SPEED, MOVE_MAX_SPEED,
+  STEP_PEAK, STEP_VALLEY, STEP_MIN_GAP_MS, STEP_MAX_GAP_MS,
+  CALIB_MIN_M, CALIB_MIN_STEPS, CALIB_GAIN, STRIDE_MIN, STRIDE_MAX, DIST_CORRECT_GAIN,
 } from './config.js';
 
 const R_EARTH = 6371000;
@@ -18,61 +22,71 @@ export function haversine(a, b) {
   return 2 * R_EARTH * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
+/** Modos oferecidos na tela de preparo. */
+export const MODES = [
+  { id: 'steps+gps', label: 'PASSOS+GPS', hint: 'Passos movem o heroi. GPS mede a distancia real.' },
+  { id: 'steps',     label: 'SO PASSOS',  hint: 'Esteira ou sem sinal. Nao liga o GPS.' },
+  { id: 'demo',      label: 'DEMO',       hint: 'Simulador, para testar sem correr.' },
+];
+
 export class Tracker {
   constructor() {
-    this.mode = 'gps';           // 'gps' | 'steps' | 'demo'
+    this.mode = 'steps+gps';
     this.status = 'idle';        // 'idle' | 'waiting' | 'ok' | 'denied' | 'error' | 'stale'
     this.message = '';
 
+    /** Distância do JOGO: passos × passada. É ela que avança o percurso. */
     this.distanceM = 0;
-    this.speedMs = 0;            // suavizada
-    this.rawSpeedMs = 0;
-    this.accuracy = null;
+    /** Distância medida pelo GPS. Usada no relatório e para calibrar a passada. */
+    this.gpsDistanceM = 0;
+
     this.steps = 0;
     this.stride = DEFAULT_STRIDE;
+    this.strideCalibrated = false;
+    this.moving = false;
+
+    this.accuracy = null;
+    this.position = null;        // {lat, lon} do último fix bom (multijogador)
 
     this.running = false;
     this.startedAt = 0;
     this.lastFixAt = 0;
-    this.lastAcceptedAt = 0;
 
-    // Estado de movimento (ver config.js). `moving` tem histerese: liga na
-    // hora e só desliga após STOP_CONFIRM_MS realmente parado.
-    this.moving = false;
-    this._lastMoveAt = 0;
-    this._window = [];          // amostras {t, dist} da janela deslizante
-    this._lastSampleAt = 0;
-    this._cadenceSpeed = 0;     // velocidade estimada pela cadência de passos
+    this._watchId = null;
+    this._onMotion = null;
+    this._lastFix = null;
 
-    // Diagnóstico, exibido na tela de depuração
+    // Detector de passos
+    this._grav = 9.81;
+    this._peakState = 'low';
+    this._lastStepAt = -Infinity;
+    this._stepGaps = [];
+    this._cadenceSpeed = 0;
+
+    // Calibração
+    this._calibGpsStart = 0;
+    this._calibStepStart = 0;
+
+    // Simulador
+    this._demoSpeed = 3.0;
+    this._demoBoost = 0;
+    this._demoStepAcc = 0;
+
+    // Diagnóstico
+    this.motionOk = false;
     this.fixesRecebidos = 0;
     this.fixesAceitos = 0;
     this.fixesImprecisos = 0;
     this.fixesJitter = 0;
     this.fixesAbsurdos = 0;
-    this.motionOk = false;
+    this.calibracoes = 0;
 
-    this._watchId = null;
-    this._lastFix = null;
-    this._onMotion = null;
-
-    // Estado do detector de passos
-    this._grav = 9.81;
-    this._peakState = 'low';
-    // -Infinity para o primeiro passo nunca cair no período refratário.
-    this._lastStepAt = -Infinity;
-    this._stepIntervals = [];
-
-    // Simulador
-    this._demoSpeed = 3.0;       // m/s (~5:33 min/km)
-    this._demoBoost = 0;
-
-    this.onUpdate = null;        // callback opcional
+    this.onUpdate = null;
   }
 
   // ---------- ciclo de vida ----------
 
-  async start(mode = 'gps') {
+  async start(mode = 'steps+gps') {
     this.mode = mode;
     this.running = true;
     this.startedAt = performance.now();
@@ -80,17 +94,26 @@ export class Tracker {
     this.status = 'waiting';
     this.message = '';
 
-    // O acelerômetro sobe em TODOS os modos. No modo GPS ele não conta
-    // distância: serve como detector de movimento, que responde na hora e não
-    // depende do satélite. É o que permite o herói começar a correr assim que
-    // o usuário anda, sem esperar o próximo fix.
-    this._startMotion();
+    if (mode === 'demo') {
+      this.status = 'ok';
+      this.message = 'Simulador';
+      return true;
+    }
 
-    if (mode === 'gps') return this._startGps();
-    if (mode === 'steps') return this._startSteps();
-    this.status = 'ok';
-    this.message = 'Simulador';
-    return true;
+    const temSensor = await this._startMotion();
+    if (!temSensor) {
+      this.status = 'error';
+      this.message = 'Sem sensor de movimento';
+    } else {
+      this.status = 'ok';
+      this.message = '';
+    }
+
+    // O GPS é opcional: sem ele o jogo roda igual, só perde a distância
+    // aferida, a média final e o multijogador.
+    if (mode === 'steps+gps') this._startGps();
+
+    return temSensor;
   }
 
   stop() {
@@ -108,202 +131,35 @@ export class Tracker {
   reset() {
     this.stop();
     this.distanceM = 0;
-    this.speedMs = 0;
-    this.rawSpeedMs = 0;
+    this.gpsDistanceM = 0;
     this.steps = 0;
-    this._lastFix = null;
-    this._stepIntervals = [];
-    this._window = [];
-    this._lastSampleAt = 0;
-    this._cadenceSpeed = 0;
-    this._lastStepAt = -Infinity;
-    this._lastMoveAt = 0;
     this.moving = false;
+    this._lastFix = null;
+    this._lastStepAt = -Infinity;
+    this._stepGaps = [];
+    this._cadenceSpeed = 0;
+    this._calibGpsStart = 0;
+    this._calibStepStart = 0;
+    this._demoStepAcc = 0;
+    this.position = null;
+    this.accuracy = null;
+    this.strideCalibrated = false;
     this.fixesRecebidos = this.fixesAceitos = 0;
     this.fixesImprecisos = this.fixesJitter = this.fixesAbsurdos = 0;
+    this.calibracoes = 0;
     this.status = 'idle';
   }
 
-  // ---------- GPS ----------
-
-  async _startGps() {
-    if (!('geolocation' in navigator)) {
-      this.status = 'error';
-      this.message = 'Sem GPS neste aparelho';
-      return false;
-    }
-    if (!window.isSecureContext) {
-      this.status = 'error';
-      this.message = 'Precisa de HTTPS';
-      return false;
-    }
-
-    this._watchId = navigator.geolocation.watchPosition(
-      p => this._onFix(p),
-      e => {
-        if (e.code === 1) { this.status = 'denied'; this.message = 'Permissao negada'; }
-        else { this.status = 'error'; this.message = 'GPS indisponivel'; }
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
-    );
-    return true;
-  }
-
-  _onFix(pos) {
-    if (!this.running) return;
-    const now = performance.now();
-    this.lastFixAt = now;
-    this.accuracy = pos.coords.accuracy;
-    this.fixesRecebidos++;
-
-    // Fix ruim demais: mantém o status, mas não integra distância.
-    if (pos.coords.accuracy > GPS_MAX_ACCURACY) {
-      this.fixesImprecisos++;
-      if (this.status !== 'ok') { this.status = 'waiting'; this.message = 'Buscando sinal'; }
-      return;
-    }
-
-    const fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, t: pos.timestamp || Date.now() };
-
-    if (!this._lastFix) {
-      this._lastFix = fix;
-      this.status = 'ok';
-      this.message = '';
-      this.lastAcceptedAt = now;
-      return;
-    }
-
-    const d = haversine(this._lastFix, fix);
-    const dt = Math.max(0.001, (fix.t - this._lastFix.t) / 1000);
-
-    // Jitter: NÃO move o ponto de referência, para que caminhadas lentas somem
-    // ao longo de vários fixes em vez de se perderem. Caminhando a 1,3 m/s com
-    // fix a cada segundo, cada passo isolado cai aqui — dois já passam.
-    if (d < GPS_MIN_DELTA) {
-      this.fixesJitter++;
-      return;
-    }
-    // Salto impossível: fix ruim, descarta e recomeça a referência.
-    if (d / dt > GPS_MAX_SPEED) {
-      this.fixesAbsurdos++;
-      this._lastFix = fix;
-      return;
-    }
-
-    this.distanceM += d;
-    this.rawSpeedMs = d / dt;
-    this._lastFix = fix;
-    this.lastAcceptedAt = now;
-    this.fixesAceitos++;
-    this.status = 'ok';
-    this.message = '';
-    this.onUpdate?.(this);
-  }
+  // ---------- acelerômetro (movimento) ----------
 
   /**
-   * Velocidade medida sobre a janela deslizante de deslocamento.
-   *
-   * Antes a velocidade saía de um fix contra o outro e decaía a cada frame — o
-   * que a zerava em ~1 s e fazia o herói parar mesmo com o usuário andando.
-   * Aqui ela vem do quanto a distância cresceu ao longo de vários segundos, o
-   * que é estável mesmo com fixes irregulares ou descartados.
-   */
-  get windowSpeed() {
-    if (this._window.length < 2) return 0;
-    const a = this._window[0];
-    const b = this._window[this._window.length - 1];
-    const dt = (b.t - a.t) / 1000;
-    if (dt < 0.6) return 0;
-    return Math.max(0, (b.dist - a.dist) / dt);
-  }
-
-  /**
-   * Velocidade usada para animar o herói e rolar o cenário.
-   *
-   * Enquanto o estado for "em movimento" ela nunca zera: o mundo continua
-   * andando entre um fix e outro, sem depender de o satélite responder. Só cai
-   * a zero quando o movimento é dado como encerrado (ver _updateMovement).
-   */
-  get displaySpeedMs() {
-    if (!this.moving) return 0;
-    // A distância verdadeira vem do GPS, então a exibição segue a janela.
-    // A cadência é só reserva, para quando a janela ainda não tem dados (início
-    // da corrida, ou sinal ausente) — usar o máximo das duas fazia o cenário
-    // correr adiantado sempre que o balanço do bolso inflava a contagem.
-    const base = this.windowSpeed > 0.2 ? this.windowSpeed : this._cadenceSpeed;
-    return Math.max(base, MOVE_MIN_SPEED);
-  }
-
-  /**
-   * Velocidade nos últimos ~2,5 s.
-   *
-   * A janela cheia de 5 s é boa para estimar o ritmo, mas lenta para perceber
-   * que o usuário parou: levava quase 8 s até o herói parar. Esta janela curta
-   * decide só a transição para "parado".
-   */
-  get recentSpeed() {
-    const w = this._window;
-    if (w.length < 2) return 0;
-    const b = w[w.length - 1];
-    const corte = b.t - STOP_WINDOW_MS;
-    let a = w[0];
-    for (let i = w.length - 1; i >= 0; i--) {
-      a = w[i];
-      if (w[i].t <= corte) break;
-    }
-    const dt = (b.t - a.t) / 1000;
-    if (dt < 0.6) return this.windowSpeed;
-    return Math.max(0, (b.dist - a.dist) / dt);
-  }
-
-  /** Amostra a janela em intervalos fixos, independente da chegada de fixes. */
-  _sampleWindow(now) {
-    if (now - this._lastSampleAt < SPEED_SAMPLE_MS) return;
-    this._lastSampleAt = now;
-    this._window.push({ t: now, dist: this.distanceM });
-    while (this._window.length > 2 && now - this._window[0].t > SPEED_WINDOW_MS) {
-      this._window.shift();
-    }
-  }
-
-  /**
-   * Estado de movimento, com histerese e duas fontes independentes.
-   *
-   * Liga assim que QUALQUER sinal indica deslocamento — o acelerômetro reage em
-   * menos de um passo, sem esperar o GPS. Só desliga depois de STOP_CONFIRM_MS
-   * com os dois sinais em silêncio, para que uma falha momentânea de sinal não
-   * pare o herói no meio da corrida.
-   */
-  _updateMovement(now, dt) {
-    // Para entrar em movimento basta a janela cheia acusar deslocamento; para
-    // sair, usa a janela curta, que percebe a parada bem mais rápido.
-    const porGps = (this.moving ? this.recentSpeed : this.windowSpeed) > MOVE_ON_SPEED;
-    const porPassos = (now - this._lastStepAt) < STEP_RECENT_MS;
-
-    if (porGps || porPassos) {
-      this._lastMoveAt = now;
-      this.moving = true;
-    } else if (this.moving && now - this._lastMoveAt > STOP_CONFIRM_MS) {
-      this.moving = false;
-    }
-
-    // Velocidade honesta, usada no ritmo do HUD.
-    const alvo = this.moving ? Math.max(this.windowSpeed, this._cadenceSpeed) : 0;
-    if (alvo > this.speedMs) this.speedMs = alvo;
-    else this.speedMs += (alvo - this.speedMs) * (1 - Math.exp(-dt / SPEED_DECAY_TAU));
-    if (this.speedMs < 0.05) this.speedMs = 0;
-  }
-
-  // ---------- Pedômetro / detector de movimento ----------
-
-  /**
-   * Liga o acelerômetro. Roda em qualquer modo: mesmo no GPS ele é o detector
-   * de movimento que responde na hora. No Android não precisa de permissão em
-   * contexto seguro; no iOS precisa, e se for negada o jogo segue só com GPS.
+   * Liga o acelerômetro. No Android não pede permissão em contexto seguro;
+   * no iOS pede, e a chamada precisa vir de um gesto do usuário.
    */
   async _startMotion() {
     const DME = window.DeviceMotionEvent;
-    if (!DME || this._onMotion) return false;
+    if (!DME) return false;
+    if (this._onMotion) return true;
 
     if (typeof DME.requestPermission === 'function') {
       try {
@@ -317,61 +173,120 @@ export class Tracker {
     return true;
   }
 
-  async _startSteps() {
-    const ok = await this._startMotion();
-    if (!ok && !this.motionOk) {
-      this.status = 'error';
-      this.message = 'Sem acelerometro';
-      return false;
-    }
-    this.status = 'ok';
-    this.message = 'Contando passos';
-    return true;
-  }
-
   _onAccel(ev) {
     if (!this.running) return;
     const a = ev.accelerationIncludingGravity;
     if (!a || a.x == null) return;
 
+    // Passa-baixa isola a gravidade; o resto é a aceleração do movimento.
     const mag = Math.hypot(a.x, a.y, a.z);
-    this._grav += (mag - this._grav) * 0.08;      // passa-baixa = componente da gravidade
-    const ac = mag - this._grav;                   // aceleração dinâmica
-
-    const now = performance.now();
-    const HI = 1.35, LO = -0.6, MIN_GAP = 250, MAX_GAP = 2000;
-
-    if (this._peakState === 'low' && ac > HI) {
-      if (now - this._lastStepAt > MIN_GAP) {
-        const gap = now - this._lastStepAt;
-        this._lastStepAt = now;
-        this.steps++;
-
-        // Só o modo PASSOS usa o acelerômetro como fonte de distância. No modo
-        // GPS ele apenas informa que há movimento — a distância vem do satélite.
-        if (this.mode === 'steps') this.distanceM += this.stride;
-
-        if (gap < MAX_GAP) {
-          this._stepIntervals.push(gap);
-          if (this._stepIntervals.length > 8) this._stepIntervals.shift();
-          const avg = this._stepIntervals.reduce((s, v) => s + v, 0) / this._stepIntervals.length;
-          this._cadenceSpeed = this.stride / (avg / 1000);
-        }
-        this.lastAcceptedAt = now;
-        this.onUpdate?.(this);
-      }
-      this._peakState = 'high';
-    } else if (this._peakState === 'high' && ac < LO) {
-      this._peakState = 'low';
-    }
-
-    if (now - this._lastStepAt > MAX_GAP) this._cadenceSpeed = 0;
+    this._grav += (mag - this._grav) * 0.08;
+    this._registerAccel(mag - this._grav, performance.now());
   }
 
-  // ---------- Simulador ----------
+  /** Máquina de pico/vale do detector de passos. Separada para poder testar. */
+  _registerAccel(ac, now) {
+    if (this._peakState === 'low' && ac > STEP_PEAK) {
+      if (now - this._lastStepAt > STEP_MIN_GAP_MS) {
+        const gap = now - this._lastStepAt;
+        this._lastStepAt = now;
+        this.step(gap);
+      }
+      this._peakState = 'high';
+    } else if (this._peakState === 'high' && ac < STEP_VALLEY) {
+      this._peakState = 'low';
+    }
+  }
+
+  /** Contabiliza um passo: avança a distância do jogo e atualiza a cadência. */
+  step(gap = Infinity) {
+    this.steps++;
+    this.distanceM += this.stride;
+
+    if (gap < STEP_MAX_GAP_MS) {
+      this._stepGaps.push(gap);
+      if (this._stepGaps.length > CADENCE_SAMPLES) this._stepGaps.shift();
+      const media = this._stepGaps.reduce((s, v) => s + v, 0) / this._stepGaps.length;
+      const v = this.stride / (media / 1000);
+      this._cadenceSpeed = Math.min(MOVE_MAX_SPEED, v);
+    }
+    this.onUpdate?.(this);
+  }
+
+  // ---------- GPS (medição, não movimento) ----------
+
+  _startGps() {
+    if (!('geolocation' in navigator) || !window.isSecureContext) return false;
+
+    this._watchId = navigator.geolocation.watchPosition(
+      p => this._onFix(p),
+      () => { /* sem GPS o jogo continua: ele não move o herói */ },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
+    );
+    return true;
+  }
+
+  _onFix(pos) {
+    if (!this.running) return;
+    const now = performance.now();
+    this.lastFixAt = now;
+    this.accuracy = pos.coords.accuracy;
+    this.fixesRecebidos++;
+
+    if (pos.coords.accuracy > GPS_MAX_ACCURACY) { this.fixesImprecisos++; return; }
+
+    const fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, t: pos.timestamp || Date.now() };
+    this.position = { lat: fix.lat, lon: fix.lon };
+
+    if (!this._lastFix) { this._lastFix = fix; return; }
+
+    const d = haversine(this._lastFix, fix);
+    const dt = Math.max(0.001, (fix.t - this._lastFix.t) / 1000);
+
+    // Jitter: não move a referência, para o deslocamento somar ao longo de
+    // vários fixes em vez de se perder.
+    if (d < GPS_MIN_DELTA) { this.fixesJitter++; return; }
+    if (d / dt > GPS_MAX_SPEED) { this.fixesAbsurdos++; this._lastFix = fix; return; }
+
+    this.gpsDistanceM += d;
+    this._lastFix = fix;
+    this.fixesAceitos++;
+    this._calibrateStride();
+  }
+
+  /**
+   * Ajusta a passada comparando metros do GPS com passos dados no mesmo trecho.
+   *
+   * Sem isso a distância do jogo herda o erro da passada padrão — e é ela que
+   * decide quando a meta foi cumprida. Só ajusta com trecho e amostra grandes o
+   * bastante, e rejeita resultados fora do que é uma passada humana.
+   */
+  _calibrateStride() {
+    const dGps = this.gpsDistanceM - this._calibGpsStart;
+    const dSteps = this.steps - this._calibStepStart;
+    if (dGps < CALIB_MIN_M || dSteps < CALIB_MIN_STEPS) return;
+
+    const medida = dGps / dSteps;
+    if (medida >= STRIDE_MIN && medida <= STRIDE_MAX) {
+      this.stride += (medida - this.stride) * CALIB_GAIN;
+      this.strideCalibrated = true;
+      this.calibracoes++;
+
+      // Puxa também o total acumulado: os passos dados antes desta medição
+      // entraram com a passada errada. Sem isso o jogo fecha a meta de 6 km
+      // com 5,3 km percorridos de verdade.
+      this.distanceM += (this.gpsDistanceM - this.distanceM) * DIST_CORRECT_GAIN;
+    }
+    this._calibGpsStart = this.gpsDistanceM;
+    this._calibStepStart = this.steps;
+  }
+
+  // ---------- simulador ----------
 
   demoNudge(meters = 50) { this._demoBoost += meters; }
   setDemoSpeed(v) { this._demoSpeed = v; }
+
+  // ---------- loop ----------
 
   /** Chamado a cada frame pelo jogo. dt em segundos. */
   tick(dt) {
@@ -379,47 +294,67 @@ export class Tracker {
     const now = performance.now();
 
     if (this.mode === 'demo') {
+      // Gera passos de verdade, para o simulador exercitar o mesmo caminho.
       const extra = Math.min(this._demoBoost, this._demoSpeed * 6 * dt);
       this._demoBoost -= extra;
-      this.distanceM += this._demoSpeed * dt + extra;
-      this._lastStepAt = now;              // o simulador está sempre "andando"
+      this._demoStepAcc += (this._demoSpeed * dt + extra) / this.stride;
+      while (this._demoStepAcc >= 1) {
+        this._demoStepAcc -= 1;
+        const gap = (this.stride / this._demoSpeed) * 1000;
+        this._lastStepAt = now;
+        this.step(gap);
+      }
+      this.gpsDistanceM = this.distanceM;
     }
 
-    if (this.mode === 'gps' && this.status === 'ok' && now - this.lastFixAt > GPS_TIMEOUT_MS) {
+    if (this.mode === 'steps+gps' && this.status === 'ok' && now - this.lastFixAt > GPS_TIMEOUT_MS) {
       this.status = 'stale';
-      this.message = 'Sinal perdido';
+      this.message = 'Sem sinal de GPS';
     }
 
-    // A janela e o estado de movimento valem para todos os modos.
-    this._sampleWindow(now);
-    this._updateMovement(now, dt);
+    // Estado de movimento: liga no primeiro passo, desliga após o silêncio.
+    const desdeUltimoPasso = now - this._lastStepAt;
+    if (desdeUltimoPasso < STEP_RECENT_MS) {
+      this.moving = true;
+    } else if (this.moving && desdeUltimoPasso > STOP_CONFIRM_MS) {
+      this.moving = false;
+      this._stepGaps = [];
+      this._cadenceSpeed = 0;
+    }
   }
 
-  // ---------- Derivados ----------
+  // ---------- derivados ----------
 
-  /** Ritmo atual em min/km (Infinity quando parado). */
-  get paceMinKm() {
-    if (!this.moving || this.speedMs < 0.35) return Infinity;
-    return (1000 / this.speedMs) / 60;
+  /**
+   * Velocidade usada para animar o herói e rolar o cenário.
+   * Vem da cadência dos passos — instantânea e independente de sinal.
+   */
+  get displaySpeedMs() {
+    if (!this.moving) return 0;
+    return Math.max(this._cadenceSpeed, MOVE_MIN_SPEED);
   }
 
-  /** Ritmo médio desde o início, em min/km. */
-  paceAvg(elapsedS) {
-    if (this.distanceM < 20 || elapsedS <= 0) return Infinity;
-    return (elapsedS / 60) / (this.distanceM / 1000);
+  get cadenceSpeed() { return this._cadenceSpeed; }
+
+  /** Passos por minuto. */
+  get cadenceSpm() {
+    if (!this.moving || !this._stepGaps.length) return 0;
+    const media = this._stepGaps.reduce((s, v) => s + v, 0) / this._stepGaps.length;
+    return Math.round(60000 / media);
   }
 
-  /** Estado de movimento com histerese — não oscila entre um fix e outro. */
+  /** Distância a reportar: a do GPS quando houver, senão a dos passos. */
+  get reportedDistanceM() {
+    return this.gpsDistanceM > 0 ? this.gpsDistanceM : this.distanceM;
+  }
+
+  /** Velocidade média da corrida inteira, em km/h. */
+  avgSpeedKmh(elapsedS) {
+    if (elapsedS <= 0) return 0;
+    return (this.reportedDistanceM / elapsedS) * 3.6;
+  }
+
   get isMoving() { return this.moving; }
-}
-
-export function formatPace(minKm) {
-  if (!isFinite(minKm) || minKm > 99) return '--:--';
-  const m = Math.floor(minKm);
-  const s = Math.round((minKm - m) * 60);
-  const mm = s === 60 ? m + 1 : m;
-  const ss = s === 60 ? 0 : s;
-  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
 export function formatTime(sec) {
@@ -430,4 +365,10 @@ export function formatTime(sec) {
   return h > 0
     ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
     : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** Velocidade em km/h com uma casa, para o relatório final. */
+export function formatKmh(kmh) {
+  if (!isFinite(kmh) || kmh <= 0) return '--';
+  return kmh.toFixed(1);
 }

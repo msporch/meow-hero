@@ -13,7 +13,7 @@ import { ctx, clear, rect, rectOutline, panel, dither, progressBar } from './gfx
 import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js';
 import { A, drawSprite, drawAnim, drawGround, spriteSize } from './assets.js';
 import { Course } from './course.js';
-import { Tracker, formatPace, formatTime } from './tracker.js';
+import { Tracker, MODES, formatTime, formatKmh } from './tracker.js';
 import { sfx, resumeAudio, vibrate } from './audio.js';
 import * as store from './storage.js';
 
@@ -21,12 +21,6 @@ const S = {
   TITLE: 'title', SETUP: 'setup', ARM: 'arm', RUN: 'run',
   PAUSE: 'pause', FINALE: 'finale', RESULT: 'result', HISTORY: 'history',
 };
-
-const MODES = [
-  { id: 'gps',   label: 'GPS',      hint: 'Ao ar livre. Usa o sinal de GPS.' },
-  { id: 'steps', label: 'PASSOS',   hint: 'Esteira ou indoor. Conta passos.' },
-  { id: 'demo',  label: 'DEMO',     hint: 'Simulador, para testar sem correr.' },
-];
 
 export class Game {
   constructor() {
@@ -40,7 +34,7 @@ export class Game {
     const d = store.load();
     this.goalKm = d.lastGoal ?? 5;
     this.paceMinKm = d.lastPace ?? 8;
-    this.mode = d.lastMode ?? 'gps';
+    this.mode = MODES.some(m => m.id === d.lastMode) ? d.lastMode : 'steps+gps';
     this.setupRow = 0;
 
     this.coins = 0;
@@ -350,7 +344,7 @@ export class Game {
     const st = this.tracker.status;
     const lines = {
       idle: 'Iniciando...',
-      waiting: this.mode === 'gps' ? 'Procurando satelites' : 'Aguardando sensor',
+      waiting: 'Ligando o sensor',
       ok: 'Pronto!',
       denied: 'Permissao negada',
       error: this.tracker.message || 'Sensor indisponivel',
@@ -369,9 +363,8 @@ export class Game {
 
     const dots = '.'.repeat(1 + (Math.floor(this.t * 2) % 3));
     if (st === 'denied' || st === 'error') {
-      const msg = this.mode === 'gps'
-        ? 'Autorize a localizacao ou volte e escolha PASSOS.'
-        : 'Autorize o sensor de movimento ou use DEMO.';
+      // Sem acelerômetro o herói não anda — é ele que move o jogo agora.
+      const msg = 'Autorize o sensor de movimento, ou volte e escolha DEMO.';
       wrapText(msg, W - 16).forEach((l, i) => drawText(ctx, l, W / 2, 112 + i * LINE_H, 0, 'center'));
       drawText(ctx, 'B VOLTA', W / 2, H - 10, 0, 'center');
     } else {
@@ -633,14 +626,13 @@ export class Game {
       if (x < W - 5) rect(x, 13, 1, 6, tr.distanceM / 1000 >= k ? 0 : 2);
     }
 
-    // Moedas e ritmo, na faixa de céu (fora do HUD escuro).
+    // Moedas e passos, na faixa de céu (fora do HUD escuro).
+    //
+    // Não há mais ritmo instantâneo aqui: a leitura minuto/km oscilava demais
+    // para ser confiável a cada segundo. A média da corrida fica no relatório
+    // final, onde o intervalo é longo o bastante para o número significar algo.
     drawTextShadow(ctx, `\x05${String(this.coins).padStart(4, '0')}`, 3, HUD_H + 3, 0, 3);
-    const pace = tr.moving ? formatPace(tr.paceMinKm) : '--:--';
-    drawTextShadow(ctx, `${pace}/KM`, W - 3, HUD_H + 3, 0, 3, 'right');
-
-    if (tr.status === 'stale') {
-      drawTextShadow(ctx, 'SINAL FRACO', W / 2, HUD_H + 14, 0, 3, 'center');
-    }
+    drawTextShadow(ctx, `${tr.steps} PASSOS`, W - 3, HUD_H + 3, 0, 3, 'right');
   }
 
   /**
@@ -655,26 +647,26 @@ export class Game {
     rect(0, 0, W, H, 0);
 
     const L = (y, txt, cor = 3) => drawText(ctx, txt, 3, y, cor);
-    let y = 3;
-    drawText(ctx, 'DIAGNOSTICO', W / 2, y, 2, 'center'); y += 11;
+    let y = 2;
+    drawText(ctx, 'DIAGNOSTICO', W / 2, y, 2, 'center'); y += 10;
 
-    L(y, `MODO ${this.mode.toUpperCase()}  ${tr.status.toUpperCase()}`); y += 9;
-    L(y, `PRECISAO ${tr.accuracy == null ? '--' : Math.round(tr.accuracy) + 'M'}`); y += 9;
+    L(y, 'MOVIMENTO (PASSOS)', 2); y += 9;
+    L(y, ` SENSOR ${tr.motionOk ? 'SIM' : 'NAO'}  ${tr.moving ? 'ANDANDO' : 'PARADO'}`); y += 9;
+    L(y, ` PASSOS ${tr.steps}  ${tr.cadenceSpm}/MIN`); y += 9;
+    L(y, ` VEL ${tr.displaySpeedMs.toFixed(2)}M/S  FPS ${Math.round(this._fps)}`); y += 10;
 
-    L(y, 'FIXES', 2); y += 9;
-    L(y, ` RECEB ${tr.fixesRecebidos}  USADOS ${tr.fixesAceitos}`); y += 9;
-    L(y, ` IMPREC ${tr.fixesImprecisos}  JITTER ${tr.fixesJitter}`); y += 9;
-    L(y, ` ABSURDO ${tr.fixesAbsurdos}`); y += 11;
+    L(y, 'PASSADA', 2); y += 9;
+    L(y, ` ${tr.stride.toFixed(3)}M  ${tr.strideCalibrated ? 'AFERIDA' : 'PADRAO'} x${tr.calibracoes}`); y += 10;
 
-    L(y, 'MOVIMENTO', 2); y += 9;
-    L(y, ` ${tr.moving ? 'ANDANDO' : 'PARADO'}   PASSOS ${tr.steps}`); y += 9;
-    L(y, ` JANELA ${tr.windowSpeed.toFixed(2)} TELA ${tr.displaySpeedMs.toFixed(2)}`); y += 9;
-    L(y, ` SENSOR ${tr.motionOk ? 'SIM' : 'NAO'}  FPS ${Math.round(this._fps)}`); y += 11;
+    L(y, 'GPS (SO MEDE)', 2); y += 9;
+    L(y, ` ${tr.status.toUpperCase()}  PREC ${tr.accuracy == null ? '--' : Math.round(tr.accuracy) + 'M'}`); y += 9;
+    L(y, ` FIX ${tr.fixesRecebidos} USA ${tr.fixesAceitos} JIT ${tr.fixesJitter}`); y += 9;
+    L(y, ` IMPREC ${tr.fixesImprecisos}  ABSURDO ${tr.fixesAbsurdos}`); y += 10;
 
-    L(y, `REAL ${tr.distanceM.toFixed(1)}M`); y += 9;
-    L(y, `TELA ${this.shownM.toFixed(1)}M  DIF ${(tr.distanceM - this.shownM).toFixed(1)}`); y += 11;
+    L(y, `JOGO ${(tr.distanceM / 1000).toFixed(2)}KM  GPS ${(tr.gpsDistanceM / 1000).toFixed(2)}KM`); y += 9;
+    L(y, `TELA ${this.shownM.toFixed(1)}M DIF ${(tr.distanceM - this.shownM).toFixed(1)}`);
 
-    drawText(ctx, 'B FECHA', W / 2, H - 10, 1, 'center');
+    drawText(ctx, 'B FECHA', W / 2, H - 9, 1, 'center');
   }
 
   _drawPause() {
@@ -778,37 +770,39 @@ export class Game {
     drawText(ctx, this.saved ? 'GATO SALVO!' : 'FIM DA CORRIDA', W / 2, 4, 3, 'center');
 
     const tr = this.tracker;
-    const km = tr.distanceM / 1000;
-    const pace = tr.paceAvg(this.elapsed);
+    // A distância do relatório é a do GPS quando houver: ela é aferida, e a do
+    // jogo vem de passos × passada estimada.
+    const km = tr.reportedDistanceM / 1000;
 
     const rows = [
       ['DISTANCIA', `${km.toFixed(2)} KM`],
       ['META', `${this.goalKm} KM`],
       ['TEMPO', formatTime(this.elapsed)],
-      ['RITMO', `${formatPace(pace)} /KM`],
+      ['MEDIA', `${formatKmh(tr.avgSpeedKmh(this.elapsed))} KM/H`],
+      ['PASSOS', String(tr.steps)],
       ['MOEDAS', `\x05 ${this.coins}`],
     ];
     rows.forEach(([k, v], i) => {
-      const y = 18 + i * 10;
+      const y = 17 + i * 9;
       drawText(ctx, k, 6, y, 1);
       drawText(ctx, v, W - 6, y, 0, 'right');
     });
 
     // O gato fica na faixa livre entre os números e a barra, sem cobrir texto.
     const catAnim = this.saved ? 'cat_happy' : 'cat_sit';
-    drawAnim(catAnim, Math.floor(this.t * (this.saved ? 8 : 4)), W / 2, 92);
+    drawAnim(catAnim, Math.floor(this.t * (this.saved ? 8 : 4)), W / 2, 94);
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
-    progressBar(6, 94, W - 12, 9, pct / 100, 0, 3);
-    drawText(ctx, `${pct}%`, W / 2, 105, 0, 'center');
+    progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);
+    drawText(ctx, `${pct}%`, W / 2, 107, 0, 'center');
 
     const d = store.load();
-    rect(0, 114, W, H - 114, 0);
-    drawText(ctx, `TOTAL \x05${d.coins}  \x04${d.catsSaved}`, W / 2, 116, 2, 'center');
+    rect(0, 116, W, H - 116, 0);
+    drawText(ctx, `TOTAL \x05${d.coins}  \x04${d.catsSaved}`, W / 2, 118, 2, 'center');
     if (Math.floor(this.t * 1.6) % 2 === 0) {
-      drawText(ctx, 'START CORRE DE NOVO', W / 2, 125, 3, 'center');
+      drawText(ctx, 'START CORRE DE NOVO', W / 2, 127, 3, 'center');
     }
-    drawText(ctx, 'B MENU  SELECT HISTORICO', W / 2, 134, 1, 'center');
+    drawText(ctx, 'B MENU  SELECT HISTORICO', W / 2, 136, 1, 'center');
   }
 
   // ---------------- HISTÓRICO ----------------
