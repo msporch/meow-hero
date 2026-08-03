@@ -8,6 +8,7 @@ import {
   W, H, GROUND_Y, HUD_H, HERO_X, PX_PER_M, GOALS, PACES,
   CHUNK_PX, MILK_SECONDS, CUE_HALFWAY, CUE_LOW_TIME_S,
   SHOWN_GAIN, SHOWN_GAIN_CATCHUP, SHOWN_CATCHUP_M, SHOWN_MAX_SPEED, SHOWN_SNAP_M,
+  GHOST_TRACE_S, GHOST_TRACE_MAX, GHOST_PX_PER_M, GHOST_MAX_OFFSET,
 } from './config.js';
 import { ctx, clear, rect, rectOutline, panel, dither, progressBar } from './gfx.js';
 import { drawText, drawTextShadow, textWidth, wrapText, LINE_H } from './font.js';
@@ -44,6 +45,13 @@ export class Game {
     // Distância usada só para desenhar — ver _updateShownDistance.
     this.shownM = 0;
     this._lastCoinSfx = 0;
+
+    // Fantasma: sua melhor corrida naquela meta, correndo junto.
+    this.ghost = null;
+    this.ghostOn = store.get('ghostOn') !== false;
+    this.ghostDeltaM = 0;
+    this._trace = [];
+    this._traceAt = 0;
     this.kmCued = 0;
     this.halfCued = false;
     this.lowTimeCued = false;
@@ -213,7 +221,7 @@ export class Game {
   // ---------------- CONFIGURAÇÃO ----------------
 
   _inputSetup(key) {
-    const rows = 3;
+    const rows = 4;
     if (key === 'up') { this.setupRow = (this.setupRow + rows - 1) % rows; sfx.select(); }
     else if (key === 'down') { this.setupRow = (this.setupRow + 1) % rows; sfx.select(); }
     else if (key === 'left' || key === 'right') {
@@ -224,9 +232,12 @@ export class Game {
       } else if (this.setupRow === 1) {
         const i = PACES.indexOf(this.paceMinKm);
         this.paceMinKm = PACES[(i + dir + PACES.length) % PACES.length];
-      } else {
+      } else if (this.setupRow === 2) {
         const i = MODES.findIndex(m => m.id === this.mode);
         this.mode = MODES[(i + dir + MODES.length) % MODES.length].id;
+      } else {
+        this.ghostOn = !this.ghostOn;
+        store.set('ghostOn', this.ghostOn);
       }
       sfx.select();
     }
@@ -242,14 +253,16 @@ export class Game {
     drawText(ctx, 'PREPARAR CORRIDA', W / 2, 4, 3, 'center');
 
     const mode = MODES.find(m => m.id === this.mode);
+    const ghost = store.getGhost(this.goalKm);
     const rows = [
       ['META', `${this.goalKm.toFixed(this.goalKm % 1 ? 1 : 0)} KM`],
       ['RITMO', `${this.paceMinKm}:00 /KM`],
       ['MODO', mode.label],
+      ['FANTASMA', !ghost ? 'SEM REGISTRO' : (this.ghostOn ? 'LIGADO' : 'DESLIGADO')],
     ];
 
     rows.forEach(([label, value], i) => {
-      const y = 24 + i * 20;
+      const y = 20 + i * 17;
       const on = i === this.setupRow;
       if (on) { rect(4, y - 3, W - 8, 17, 2); rectOutline(4, y - 3, W - 8, 17, 0); }
       // Texto recuado para as setas piscantes não encostarem nele.
@@ -261,13 +274,19 @@ export class Game {
       }
     });
 
-    // Resumo
-    rect(0, 88, W, 32, 0);
-    drawText(ctx, `TEMPO LIMITE ${formatTime(this.limitSeconds)}`, W / 2, 91, 3, 'center');
-    wrapText(mode.hint, W - 12).slice(0, 2).forEach((l, i) =>
-      drawText(ctx, l, W / 2, 102 + i * LINE_H, 2, 'center'));
+    // Resumo: a dica acompanha a linha selecionada.
+    const dica = this.setupRow === 3
+      ? (ghost
+        ? `Seu recorde: ${(ghost.distanceM / 1000).toFixed(2)} km em ${formatTime(ghost.seconds)}.`
+        : 'Termine uma corrida nesta meta para criar seu fantasma.')
+      : mode.hint;
 
-    drawText(ctx, 'START COMECA   B VOLTA', W / 2, 128, 0, 'center');
+    rect(0, 90, W, 32, 0);
+    drawText(ctx, `TEMPO LIMITE ${formatTime(this.limitSeconds)}`, W / 2, 93, 3, 'center');
+    wrapText(dica, W - 12).slice(0, 2).forEach((l, i) =>
+      drawText(ctx, l, W / 2, 104 + i * LINE_H, 2, 'center'));
+
+    drawText(ctx, 'START COMECA   B VOLTA', W / 2, 130, 0, 'center');
   }
 
   // ---------------- ARMAR (permissões / sinal) ----------------
@@ -288,6 +307,10 @@ export class Game {
     this._collectedTo = 0;
     this.shownM = 0;
     this._lastCoinSfx = 0;
+    this._trace = [0];
+    this._traceAt = 0;
+    this.ghost = this.ghostOn ? store.getGhost(this.goalKm) : null;
+    this.ghostDeltaM = 0;
     this.tracker.reset();
     this.tracker.stride = store.get('stride') || 0.78;
 
@@ -403,6 +426,20 @@ export class Game {
 
     // Coleta pela posição desenhada, para a moeda sumir quando o herói passa
     // por ela na tela. O que ficar para trás é recolhido ao fim da corrida.
+    // Traçado da corrida: distância a cada GHOST_TRACE_S, para virar o
+    // fantasma da próxima vez. O teto evita que uma maratona encha o
+    // localStorage — passado ele, amostra mais espaçado.
+    if (this.elapsed - this._traceAt >= GHOST_TRACE_S) {
+      this._traceAt = this.elapsed;
+      if (this._trace.length < GHOST_TRACE_MAX) this._trace.push(dist);
+    }
+
+    // Diferença para o fantasma: positiva = ele na frente.
+    if (this.ghost) {
+      const dg = store.ghostDistanceAt(this.ghost, this.elapsed);
+      this.ghostDeltaM = dg == null ? 0 : dg - dist;
+    }
+
     const got = this._collectUpTo(this.shownM);
 
     if (got.coins > 0 && !this.pocket) {
@@ -565,6 +602,21 @@ export class Game {
       drawSprite('truck', truckX, GROUND_Y - 1, { flip: true });
     }
 
+    // Fantasma: sua melhor corrida nesta meta, correndo junto.
+    //
+    // A posição é a diferença de distância, comprimida: 1 m real vale 24 px de
+    // mundo, então 3 m de vantagem já o tirariam de quadro. Aqui cada metro
+    // vale poucos pixels e ele encosta na borda quando a diferença é grande.
+    if (this.ghost && Math.abs(this.ghostDeltaM) > 0.5) {
+      const off = Math.max(-GHOST_MAX_OFFSET, Math.min(GHOST_MAX_OFFSET,
+        this.ghostDeltaM * GHOST_PX_PER_M));
+      const gx = HERO_X + off;
+      drawAnim('ghost_run', heroFrame, gx, GROUND_Y);
+
+      const rotulo = `${this.ghostDeltaM > 0 ? '+' : ''}${Math.round(this.ghostDeltaM)}M`;
+      drawTextShadow(ctx, rotulo, gx, GROUND_Y - 50, 0, 3, 'center');
+    }
+
     // Herói
     drawAnim(heroAnim, heroFrame, HERO_X, heroY);
 
@@ -702,6 +754,7 @@ export class Game {
     store.recordRun({
       goalKm: this.goalKm, distanceM: this.tracker.distanceM,
       seconds: this.elapsed, coins: this.coins, saved: this.saved, mode: this.mode,
+      trace: this._trace,
     });
     this.go(S.RESULT);
   }
@@ -794,7 +847,13 @@ export class Game {
 
     const pct = Math.min(100, Math.round((tr.distanceM / this.course.goalM) * 100));
     progressBar(6, 96, W - 12, 9, pct / 100, 0, 3);
-    drawText(ctx, `${pct}%`, W / 2, 107, 0, 'center');
+    drawText(ctx, `${pct}%`, 6, 107, 0);
+
+    // Como foi contra o fantasma. Delta negativo = você ficou à frente dele.
+    if (this.ghost) {
+      const d = Math.round(-this.ghostDeltaM);
+      drawText(ctx, d >= 0 ? `RECORDE +${d}M` : `RECORDE ${d}M`, W - 6, 107, 0, 'right');
+    }
 
     const d = store.load();
     rect(0, 116, W, H - 116, 0);

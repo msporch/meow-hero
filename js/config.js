@@ -110,3 +110,15 @@ export const CUE_LOW_TIME_S = 120;    // avisa quando faltarem 2 min
 
 /** Chave do armazenamento local. */
 export const SAVE_KEY = 'meowhero.save.v1';
+
+/**
+ * Fantasma: um corredor na cena vindo da sua melhor corrida naquela meta.
+ *
+ * A corrida guarda a distância a cada GHOST_TRACE_S segundos; o fantasma é
+ * essa curva reproduzida no tempo. Como 1 m vale 24 px de mundo, a diferença
+ * é comprimida na tela — senão ele sumiria de quadro com 4 m de vantagem.
+ */
+export const GHOST_TRACE_S = 5;        // intervalo de amostragem do traçado
+export const GHOST_TRACE_MAX = 900;    // teto de amostras guardadas por corrida
+export const GHOST_PX_PER_M = 4;       // compressão da diferença na tela
+export const GHOST_MAX_OFFSET = 64;    // px — além disso encosta na borda
